@@ -91,7 +91,7 @@ export default function Home() {
       <ConsejosBanner />
 
       <div className="mx-auto max-w-7xl px-4 md:px-8">
-        <h1 className="mt-8 text-2xl font-bold leading-tight text-gray-900 md:mt-10 md:text-3xl">
+        <h1 className="mt-8 text-2xl font-bold leading-tight text-orange-900 md:mt-10 md:text-xl">
           Encuentra el lugar donde vas a sobrevivir al semestre
         </h1>
 

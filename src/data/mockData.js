@@ -140,7 +140,7 @@ export const propiedades = [
     tipo: 'habitacion',
     titulo: 'Habitación en La Aurora',
     colonia: 'La Aurora',
-    direccion: 'Dirección de ejemplo, Col. La Aurora, Guadalajara',
+    direccion: 'Calle Los Pinos 145',
     coordenadas: { lat: 20.6448, lng: -103.3121 },
     distanciaKm: 2.8,
     precio: 3700,
@@ -169,7 +169,7 @@ export const propiedades = [
     tipo: 'habitacion',
     titulo: 'Habitación con terraza en La Aurora',
     colonia: 'La Aurora',
-    direccion: 'Dirección de ejemplo, Col. La Aurora, Guadalajara',
+    direccion: 'Calle Los Pinos 145',
     coordenadas: { lat: 20.6448, lng: -103.3121 },
     distanciaKm: 2.8,
     precio: 3700,
@@ -198,7 +198,7 @@ export const propiedades = [
     tipo: 'habitacion',
     titulo: 'Habitación Casa Rose en Las Conchas',
     colonia: 'Las Conchas',
-    direccion: 'Dirección de ejemplo, Col. Las Conchas, Guadalajara',
+    direccion: 'Av. de las Rosas 2310',
     coordenadas: { lat: 20.6612, lng: -103.3712 },
     distanciaKm: 5,
     precio: 3500,
@@ -227,7 +227,7 @@ export const propiedades = [
     tipo: 'loft',
     titulo: 'Loft para una persona en la Olímpica',
     colonia: 'Olímpica',
-    direccion: 'Dirección de ejemplo, Col. Olímpica, Guadalajara',
+    direccion: 'Calle Juegos olímpicos 812',
     coordenadas: { lat: 20.6581, lng: -103.3402 },
     distanciaKm: 1.6,
     precio: 5300,
@@ -256,7 +256,7 @@ export const propiedades = [
     tipo: 'habitacion',
     titulo: 'Habitación en Blanco y Cuéllar',
     colonia: 'Blanco y Cuéllar',
-    direccion: 'Dirección de ejemplo, Col. Blanco y Cuéllar, Guadalajara',
+    direccion: 'Calle Fresnillo 437',
     coordenadas: { lat: 20.6702, lng: -103.3051 },
     distanciaKm: 3.8,
     precio: 2900,
@@ -285,7 +285,7 @@ export const propiedades = [
     tipo: 'compartida',
     titulo: 'Habitación compartida en San Carlos',
     colonia: 'San Carlos',
-    direccion: 'Dirección de ejemplo, Col. San Carlos, Guadalajara',
+    direccion: 'Calle Mezquite 1290',
     coordenadas: { lat: 20.6489, lng: -103.3348 },
     distanciaKm: 1.7,
     precio: 3400,
@@ -314,7 +314,7 @@ export const propiedades = [
     tipo: 'departamento',
     titulo: 'Departamento en Del Fresno',
     colonia: 'Del Fresno',
-    direccion: 'Dirección de ejemplo, Col. Del Fresno, Guadalajara',
+    direccion: 'Calle Ébano 210',
     coordenadas: { lat: 20.6402, lng: -103.3561 },
     distanciaKm: 4.2,
     precio: 6800,
@@ -343,7 +343,7 @@ export const propiedades = [
     tipo: 'habitacion',
     titulo: 'Habitación Casa Pía en Atlas',
     colonia: 'Atlas',
-    direccion: 'Dirección de ejemplo, Col. Atlas, Guadalajara',
+    direccion: 'Calle Laurel 618',
     coordenadas: { lat: 20.6421, lng: -103.3219 },
     distanciaKm: 2.8,
     precio: 4500,
@@ -538,7 +538,7 @@ export const consejos = [
   {
     id: 'consejo-4',
     titulo: 'Prueba el trayecto a CUCEI',
-    texto: 'Haz el recorrido a la hora en que tendrías clase para conocer el tráfico real y las rutas de camión.',
+    texto: 'Haz el recorrido a la hora en que tendrías clase para conocer el tráfico real y las rutas de transporte.',
     imagen: '/img/consejos/trayecto.jpg',
   },
   {
@@ -546,6 +546,12 @@ export const consejos = [
     titulo: 'Conoce a tus roomies',
     texto: 'Pregunta por sus horarios y hábitos de estudio. Una buena convivencia vale tanto como una buena ubicación.',
     imagen: '/img/consejos/roomies.jpg',
+  },
+  {
+    id: 'consejo-6',
+    titulo: 'Seguridad ante todo',
+    texto: 'Todas las propiedades de 2ndHome fueron verificadas por nuestro equipo. Aun así, revisa cerraduras, iluminación y accesos antes de mudarte.',
+    imagen: '/img/consejos/seguridad.jpg',
   },
 ]
 
@@ -563,3 +569,6 @@ export const minutosAPie = (km) => Math.round((km / 5) * 60)
 // Formatea 3700 como "$3,700"
 export const formatoPrecio = (cantidad) =>
   cantidad.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 })
+
+export const direccionCompleta = (propiedad) =>
+  `${propiedad.direccion}, Col. ${propiedad.colonia}, Guadalajara, Jal.`
