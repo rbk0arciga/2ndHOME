@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LuHouse,
   LuUsers,
@@ -10,11 +10,13 @@ import {
   LuShieldCheck,
   LuLogIn,
   LuLogOut,
+  LuKeyRound,
+  LuGraduationCap,
 } from 'react-icons/lu'
 import logo from '../assets/logo.png'
 import Avatar from './Avatar'
-import { usuarioActual, conversaciones } from '../data/mockData'
-
+import { conversaciones } from '../data/mockData'
+import { useSesion } from '../context/sesion'
 // Contorno visible al navegar con teclado (se reutiliza en todo el archivo)
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -32,11 +34,19 @@ const PERFIL_POR_ROL = {
   admin: '/admin',
 }
 
-// Enlace destacado de la barra según quién haya iniciado sesión
+// En login y registro el Navbar solo muestra el logo
+const esPaginaDeAcceso = (pathname) => pathname === '/login' || pathname.startsWith('/registro')
+
+// Enlace hacia el rol contrario: el 2nd GUEST puede volverse 2nd HOST y viceversa.
+// El administrador no tiene contraparte.
 function accionPorRol(usuario) {
-  if (usuario?.rol === 'arrendador') return { to: '/perfil-arrendador', texto: 'Publicar propiedad' }
-  if (usuario?.rol === 'admin') return null // El admin ya llega a su panel desde "Mi perfil"
-  return { to: '/registro?rol=arrendador', texto: 'Sé un 2nd HOST' }
+  if (usuario?.rol === 'estudiante') {
+    return { to: '/registro/host', texto: 'Sé un 2nd HOST', Icono: LuKeyRound }
+  }
+  if (usuario?.rol === 'arrendador') {
+    return { to: '/registro/guest', texto: 'Sé un 2nd GUEST', Icono: LuGraduationCap }
+  }
+  return null
 }
 
 // "Alojamiento" también se marca como activa dentro del detalle de una propiedad
@@ -71,9 +81,17 @@ function MenuUsuario({ usuario, accion }) {
   const [abierto, setAbierto] = useState(false)
   const contenedorRef = useRef(null)
   const cerrar = () => setAbierto(false)
+  const { cerrarSesion } = useSesion()
+  const navigate = useNavigate()
 
+  const salir = () => {
+    cerrar()
+    cerrarSesion()
+    navigate('/login')
+  }
   // Total de mensajes sin leer (se muestra como punto y como contador)
   const noLeidos = conversaciones.reduce((total, c) => total + c.noLeidos, 0)
+  const IconoAccion = accion?.Icono
 
   // Cierra el menú al hacer clic fuera de él o al presionar Escape
   useEffect(() => {
@@ -150,18 +168,17 @@ function MenuUsuario({ usuario, accion }) {
                 </Link>
               )}
 
-              {/* En móvil la acción principal vive aquí; en escritorio está en la barra */}
+              {/* En móvil el enlace al rol contrario vive aquí; en escritorio está en la barra */}
               {accion && (
                 <Link to={accion.to} onClick={cerrar} className={`${claseItem} md:hidden`}>
-                  <LuHouse className={claseIcono} aria-hidden="true" /> {accion.texto}
+                  <IconoAccion className={claseIcono} aria-hidden="true" /> {accion.texto}
                 </Link>
               )}
 
               <hr className="my-2 border-home-orange-100" />
-              {/* Maqueta: más adelante cerrará la sesión real de Firebase */}
-              <Link to="/login" onClick={cerrar} className={claseItem}>
-                <LuLogOut className={claseIcono} aria-hidden="true" /> Cerrar sesión
-              </Link>
+                     <button type="button" onClick={salir} className={`${claseItem} w-full`}>
+                         <LuLogOut className={claseIcono} aria-hidden="true" /> Cerrar sesión
+                    </button>
             </>
           ) : (
             <>
@@ -179,7 +196,7 @@ function MenuUsuario({ usuario, accion }) {
   )
 }
 
-/* ---------- Navegación secundaria (Alojamiento, Comunidad, Consejos) ---------- */
+/* ---------- Navegación secundaria (Alojamiento, Comunidad) ---------- */
 function NavegacionSecundaria({ pathname }) {
   return (
     <nav aria-label="Secciones principales" className="px-4 pt-4 md:pt-6">
@@ -208,9 +225,9 @@ function NavegacionSecundaria({ pathname }) {
 
 /* ---------- Componente principal ---------- */
 export default function Navbar() {
-  // Mientras no exista Firebase Authentication, la sesión viene de mockData
-  const usuario = usuarioActual
+    const { usuario } = useSesion()
   const { pathname } = useLocation()
+  const enPaginaDeAcceso = esPaginaDeAcceso(pathname)
   const accion = accionPorRol(usuario)
 
   return (
@@ -224,22 +241,25 @@ export default function Navbar() {
             {/* <span className="font-logo text-2xl text-home-orange-800 md:text-3xl">2nd HOME</span> */}
           </Link>
 
-          <div className="flex items-center gap-3 md:gap-4">
-            {accion && (
-              <Link
-                to={accion.to}
-                className={`hidden rounded-md font-medium text-home-orange-900 underline decoration-home-orange-400 decoration-2 underline-offset-4 transition-colors hover:text-home-orange-700 md:inline ${ENFOQUE}`}
-              >
-                {accion.texto}
-              </Link>
-            )}
-            <BotonPerfil usuario={usuario} />
-            <MenuUsuario usuario={usuario} accion={accion} />
-          </div>
+          {/* En login y registro no se muestran las opciones de la sesión */}
+          {!enPaginaDeAcceso && (
+            <div className="flex items-center gap-3 md:gap-4">
+              {accion && (
+                <Link
+                  to={accion.to}
+                  className={`hidden rounded-md font-medium text-home-orange-900 underline decoration-home-orange-400 decoration-2 underline-offset-4 transition-colors hover:text-home-orange-700 md:inline ${ENFOQUE}`}
+                >
+                  {accion.texto}
+                </Link>
+              )}
+              <BotonPerfil usuario={usuario} />
+              <MenuUsuario usuario={usuario} accion={accion} />
+            </div>
+          )}
         </div>
       </header>
 
-      <NavegacionSecundaria pathname={pathname} />
+      {!enPaginaDeAcceso && <NavegacionSecundaria pathname={pathname} />}
     </>
   )
 }

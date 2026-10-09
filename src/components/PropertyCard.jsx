@@ -6,11 +6,10 @@ import Avatar from './Avatar'
 import {
   TIPOS_PROPIEDAD,
   GENEROS,
-  usuarioActual,
   minutosAPie,
   formatoPrecio,
 } from '../data/mockData'
-
+import { useSesion } from '../context/sesion'
 /* ---------- Foto con respaldo si no existe o no carga ---------- */
 function FotoPropiedad({ src, titulo }) {
   const [fallo, setFallo] = useState(false)
@@ -49,12 +48,10 @@ function DistanciaCucei({ km }) {
   )
 }
 
-/* ---------- Botón de favorito (solo para estudiantes) ---------- */
+/* ---------- Botón de favorito (solo para 2nd GUESTS) ---------- */
 // Maqueta: el estado vive solo en este componente. Con Firebase se guardará en el perfil.
-function BotonFavorito({ propiedadId, titulo }) {
-  const [guardado, setGuardado] = useState(
-    usuarioActual?.favoritos?.includes(propiedadId) ?? false
-  )
+function BotonFavorito({ titulo, guardadoInicial }) {
+  const [guardado, setGuardado] = useState(guardadoInicial)
 
   return (
     <button
@@ -111,7 +108,8 @@ export default function PropertyCard({ propiedad }) {
     arrendador,
   } = propiedad
 
-  const esEstudiante = usuarioActual?.rol === 'estudiante'
+  const { usuario } = useSesion()
+  const esEstudiante = usuario?.rol === 'estudiante'
   const claseEtiqueta = 'rounded-full border border-home-orange-200 bg-home-orange-50 px-2.5 py-1 text-xs font-medium text-home-orange-900'
 
   return (
@@ -129,8 +127,10 @@ export default function PropertyCard({ propiedad }) {
           </span>
         )}
 
-        {esEstudiante && <BotonFavorito propiedadId={id} titulo={titulo} />}
-      </div>
+        {esEstudiante && (
+          <BotonFavorito titulo={titulo} guardadoInicial={usuario.favoritos?.includes(id) ?? false} />
+        )}
+        </div>
 
       {/* Información */}
       <div className="flex flex-1 flex-col gap-3 p-4">

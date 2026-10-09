@@ -126,8 +126,8 @@ export const usuarios = [
   },
 ]
 
-// Simula la sesión iniciada mientras no exista Firebase Authentication.
-export const usuarioActual = usuarios.find((u) => u.id === 'u1')
+// Contraseña de las cuentas de prueba (solo en la maqueta, mientras no exista Firebase)
+export const CONTRASENA_DEMO = 'demo1234'
 
 // ---------- Propiedades ----------
 // estado: 'approved' aparece en el catálogo; 'pending' y 'rejected' solo en el panel de administración.

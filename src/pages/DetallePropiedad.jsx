@@ -46,7 +46,6 @@ import {
   obtenerPropiedad,
   resenasDePropiedad,
   usuarios,
-  usuarioActual,
   TIPOS_PROPIEDAD,
   GENEROS,
   SERVICIOS,
@@ -59,6 +58,7 @@ import {
   formatoPrecio,
   direccionCompleta,
 } from '../data/mockData'
+import { useSesion } from '../context/sesion'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -229,24 +229,13 @@ function Encabezado({ propiedad }) {
   )
 }
 
-/* ==========================================================
-   Renta, depósito y botón de contacto
-   ========================================================== */
 function AccionContacto({ propiedadId, arrendador }) {
+  const { usuario } = useSesion()
   const nombre = primerNombre(arrendador.nombre)
   const claseBoton = `mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-home-orange-700 px-6 py-3.5 font-semibold text-white transition-colors hover:bg-home-orange-800 ${ENFOQUE}`
 
-  // Sin sesión: primero hay que iniciar sesión
-  if (!usuarioActual) {
-    return (
-      <Link to="/login" className={claseBoton}>
-        Inicia sesión para escribirle a {nombre}
-      </Link>
-    )
-  }
-
-  // Estudiante: abre el chat con esta propiedad seleccionada
-  if (usuarioActual.rol === 'estudiante') {
+  // 2nd GUEST: abre el chat con esta propiedad seleccionada
+  if (usuario?.rol === 'estudiante') {
     return (
       <>
         <Link to={`/chat?propiedad=${propiedadId}`} className={claseBoton}>
@@ -261,7 +250,7 @@ function AccionContacto({ propiedadId, arrendador }) {
   }
 
   // El dueño viendo su propia propiedad
-  if (usuarioActual.id === arrendador.id) {
+  if (usuario?.id === arrendador.id) {
     return (
       <p className="mt-6 rounded-2xl bg-home-orange-50 p-4 text-center text-sm text-home-orange-900">
         Esta es una de tus propiedades.
@@ -269,7 +258,7 @@ function AccionContacto({ propiedadId, arrendador }) {
     )
   }
 
-  // Otros arrendadores y el administrador no ven botón de contacto
+  // Otros 2nd HOSTS y el administrador no ven botón de contacto
   return null
 }
 
@@ -609,9 +598,9 @@ export default function DetallePropiedad() {
   const { id } = useParams()
   const propiedad = obtenerPropiedad(id)
 
-  const esAdmin = usuarioActual?.rol === 'admin'
-  const esDueno = usuarioActual?.id === propiedad?.arrendador.id
-
+const { usuario } = useSesion()
+  const esAdmin = usuario?.rol === 'admin'
+  const esDueno = usuario?.id === propiedad?.arrendador.id
   // Solo las propiedades aprobadas son públicas.
   // El administrador y el dueño pueden ver las demás como vista previa.
   if (!propiedad || (propiedad.estado !== 'approved' && !esAdmin && !esDueno)) {
