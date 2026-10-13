@@ -3,21 +3,17 @@ import { LuSearch, LuSlidersHorizontal } from 'react-icons/lu'
 import ConsejosBanner from '../components/ConsejosBanner'
 import PropertyCard from '../components/PropertyCard'
 import FilterBar from '../components/FilterBar'
-import { propiedadesAprobadas } from '../data/mockData'
+import { usePropiedades } from '../context/propiedades'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
 
-// Rango de precios real del catálogo (lo usa el control de precio en los filtros)
-const precios = propiedadesAprobadas.map((p) => p.precio)
-const RANGO_PRECIO = { min: Math.min(...precios), max: Math.max(...precios) }
-
-// Estado inicial de los filtros (sin ningún filtro aplicado)
+// Estado inicial de los filtros. precioMax: null significa "sin límite de precio".
 const FILTROS_INICIALES = {
   colonia: '',
   tipo: '',
   genero: '',
-  precioMax: RANGO_PRECIO.max,
+  precioMax: null,
   soloServiciosIncluidos: false,
 }
 
@@ -38,7 +34,7 @@ function contarFiltrosActivos(filtros) {
   if (filtros.colonia) total++
   if (filtros.tipo) total++
   if (filtros.genero) total++
-  if (filtros.precioMax < RANGO_PRECIO.max) total++
+  if (filtros.precioMax !== null) total++
   if (filtros.soloServiciosIncluidos) total++
   return total
 }
@@ -48,7 +44,7 @@ function cumpleFiltros(propiedad, textoBuscado, filtros) {
   if (textoBuscado && !normalizar(`${propiedad.titulo} ${propiedad.colonia}`).includes(textoBuscado)) return false
   if (filtros.colonia && propiedad.colonia !== filtros.colonia) return false
   if (filtros.tipo && propiedad.tipo !== filtros.tipo) return false
-  if (propiedad.precio > filtros.precioMax) return false
+  if (filtros.precioMax !== null && propiedad.precio > filtros.precioMax) return false
   if (filtros.soloServiciosIncluidos && !propiedad.serviciosIncluidos) return false
 
   // Género: quien busca "mujeres" u "hombres" también ve los espacios mixtos,
@@ -66,20 +62,37 @@ function cumpleFiltros(propiedad, textoBuscado, filtros) {
 }
 
 export default function Home() {
+  const { propiedades } = usePropiedades()
   const [busqueda, setBusqueda] = useState('')
   const [filtros, setFiltros] = useState(FILTROS_INICIALES)
   const [orden, setOrden] = useState('cercania')
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
 
-  // Recalcula los resultados solo cuando cambia la búsqueda, los filtros o el orden
+  // Catálogo público: solo propiedades aprobadas y con lugares disponibles
+  const catalogo = useMemo(
+    () => propiedades.filter((p) => p.estado === 'approved' && p.disponible),
+    [propiedades]
+  )
+
+  // Rango de precios del catálogo actual (lo usa el control de precio en los filtros)
+  const rangoPrecio = useMemo(() => {
+    const precios = catalogo.map((p) => p.precio)
+    return precios.length ? { min: Math.min(...precios), max: Math.max(...precios) } : { min: 0, max: 0 }
+  }, [catalogo])
+
+  // Recalcula los resultados solo cuando cambia algo relevante
   const resultados = useMemo(() => {
     const textoBuscado = normalizar(busqueda.trim())
-    return propiedadesAprobadas
-      .filter((p) => cumpleFiltros(p, textoBuscado, filtros))
-      .sort(ORDENES[orden].comparar)
-  }, [busqueda, filtros, orden])
+    return catalogo.filter((p) => cumpleFiltros(p, textoBuscado, filtros)).sort(ORDENES[orden].comparar)
+  }, [catalogo, busqueda, filtros, orden])
 
   const filtrosActivos = contarFiltrosActivos(filtros)
+
+  // El panel de filtros siempre recibe un número de precio. Si el usuario lleva el
+  // control hasta el máximo, se guarda como "sin límite" (null).
+  const filtrosParaPanel = { ...filtros, precioMax: filtros.precioMax ?? rangoPrecio.max }
+  const cambiarFiltros = (nuevos) =>
+    setFiltros({ ...nuevos, precioMax: nuevos.precioMax >= rangoPrecio.max ? null : nuevos.precioMax })
 
   const limpiarTodo = () => {
     setFiltros(FILTROS_INICIALES)
@@ -91,7 +104,7 @@ export default function Home() {
       <ConsejosBanner />
 
       <div className="mx-auto max-w-7xl px-4 md:px-8">
-        <h1 className="mt-8 text-2xl font-bold leading-tight text-orange-900 md:mt-10 md:text-xl">
+        <h1 className="mt-8 text-2xl font-bold leading-tight text-gray-900 md:mt-10 md:text-3xl">
           Encuentra el lugar donde vas a sobrevivir al semestre
         </h1>
 
@@ -138,10 +151,10 @@ export default function Home() {
           id="panel-filtros"
           abierto={filtrosAbiertos}
           onCerrar={() => setFiltrosAbiertos(false)}
-          filtros={filtros}
-          onCambiar={setFiltros}
+          filtros={filtrosParaPanel}
+          onCambiar={cambiarFiltros}
           onLimpiar={() => setFiltros(FILTROS_INICIALES)}
-          rangoPrecio={RANGO_PRECIO}
+          rangoPrecio={rangoPrecio}
           totalResultados={resultados.length}
         />
 

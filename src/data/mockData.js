@@ -44,7 +44,6 @@ export const CARACTERISTICAS = {
   accesoUnico: 'Entrada de acceso único',
   comedor: 'Comedor',
   estacionamiento: 'Estacionamiento',
-  roomies: 'Número de roomies',
 }
 
 export const AMENIDADES = {
@@ -90,7 +89,7 @@ export const CATEGORIAS_COMUNIDAD = {
 
 // ---------- Usuarios de ejemplo (uno por rol) ----------
 export const usuarios = [
-  {
+    {
     id: 'u1',
     rol: 'estudiante',
     nombre: 'Daniela Ortiz',
@@ -99,11 +98,14 @@ export const usuarios = [
     carrera: 'Ingeniería en Computación',
     semestre: 4,
     origen: 'Colima, Colima',
-    miembroDesde: '2025-08',
+    miembroDesde: '2025-01',
     bio: 'Vengo de Colima. Busco un lugar tranquilo para estudiar y cerca del campus.',
     favoritos: ['p1', 'p4'],
     // Lugares donde ha vivido a través de 2ndHome
-    historial: [{ propiedadId: 'p3', desde: '2025-08', hasta: '2026-06' }],
+    historial: [
+      { propiedadId: 'p3', desde: '2025-08', hasta: '2026-06' },
+      { propiedadId: 'p6', desde: '2025-01', hasta: '2025-07' },
+    ],
   },
   {
     id: 'u2',
