@@ -214,14 +214,12 @@ function FormularioRegistro({ tipo }) {
   const [registrado, setRegistrado] = useState(false)
 
   // Referencias para llevar el cursor al primer campo con error
-  const refs = {
-    nombre: useRef(null),
-    correo: useRef(null),
-    carrera: useRef(null),
-    telefono: useRef(null),
-    contrasena: useRef(null),
-    confirmar: useRef(null),
-  }
+  const refNombre = useRef(null)
+  const refCorreo = useRef(null)
+  const refCarrera = useRef(null)
+  const refTelefono = useRef(null)
+  const refContrasena = useRef(null)
+  const refConfirmar = useRef(null)
 
   // Actualiza un campo y borra su error en cuanto el usuario lo corrige
   const actualizar = (campo, valor) => {
@@ -234,9 +232,17 @@ function FormularioRegistro({ tipo }) {
     const nuevosErrores = validar(datos, rol)
     setErrores(nuevosErrores)
 
+    const refsPorCampo = {
+      nombre: refNombre,
+      correo: refCorreo,
+      carrera: refCarrera,
+      telefono: refTelefono,
+      contrasena: refContrasena,
+      confirmar: refConfirmar,
+    }
     const primerError = ORDEN_CAMPOS.find((campo) => nuevosErrores[campo])
     if (primerError) {
-      refs[primerError].current?.focus()
+      refsPorCampo[primerError].current?.focus()
       return
     }
 
@@ -291,7 +297,7 @@ function FormularioRegistro({ tipo }) {
 
           <form onSubmit={alEnviar} noValidate className="mt-6 space-y-5">
             <CampoFormulario
-              ref={refs.nombre}
+              ref={refNombre}
               etiqueta="Nombre completo"
               autoComplete="name"
               Icono={LuUserRound}
@@ -301,7 +307,7 @@ function FormularioRegistro({ tipo }) {
             />
 
             <CampoFormulario
-              ref={refs.correo}
+              ref={refCorreo}
               etiqueta={esEstudiante ? 'Correo institucional' : 'Correo'}
               type="email"
               autoComplete="email"
@@ -320,7 +326,7 @@ function FormularioRegistro({ tipo }) {
 
             {esEstudiante ? (
               <CampoFormulario
-                ref={refs.carrera}
+                ref={refCarrera}
                 etiqueta="Carrera"
                 placeholder="Ej. Ingeniería en Computación"
                 Icono={LuBookOpen}
@@ -330,7 +336,7 @@ function FormularioRegistro({ tipo }) {
               />
             ) : (
               <CampoFormulario
-                ref={refs.telefono}
+                ref={refTelefono}
                 etiqueta="Teléfono"
                 type="tel"
                 inputMode="numeric"
@@ -345,7 +351,7 @@ function FormularioRegistro({ tipo }) {
             )}
 
             <CampoFormulario
-              ref={refs.contrasena}
+              ref={refContrasena}
               etiqueta="Contraseña"
               type={mostrarContrasena ? 'text' : 'password'}
               autoComplete="new-password"
@@ -357,7 +363,7 @@ function FormularioRegistro({ tipo }) {
             />
 
             <CampoFormulario
-              ref={refs.confirmar}
+              ref={refConfirmar}
               etiqueta="Confirma tu contraseña"
               type={mostrarContrasena ? 'text' : 'password'}
               autoComplete="new-password"

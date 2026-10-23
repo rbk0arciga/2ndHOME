@@ -158,20 +158,16 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
   const idGrupoGenero = useId()
   const idSugerenciasColonia = useId()
   const mensajeExitoRef = useRef(null)
-
-  const refs = {
-    direccion: useRef(null),
-    colonia: useRef(null),
-    tipo: useRef(null),
-    genero: useRef(null),
-    habitacionesTotales: useRef(null),
-    banos: useRef(null),
-    roomies: useRef(null),
-    precio: useRef(null),
-    deposito: useRef(null),
-    fotos: useRef(null),
-  }
-
+  const refDireccion = useRef(null)
+  const refColonia = useRef(null)
+  const refTipo = useRef(null)
+  const refGenero = useRef(null)
+  const refHabitacionesTotales = useRef(null)
+  const refBanos = useRef(null)
+  const refRoomies = useRef(null)
+  const refPrecio = useRef(null)
+  const refDeposito = useRef(null)
+  const refFotos = useRef(null)
   const actualizar = (campo, valor) => {
     setDatos((prev) => ({ ...prev, [campo]: valor }))
     if (errores[campo]) setErrores((prev) => ({ ...prev, [campo]: undefined }))
@@ -215,9 +211,22 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
     const nuevosErrores = validar(datos, fotos)
     setErrores(nuevosErrores)
 
+        // El objeto se arma aquí (en el evento), no durante el render
+    const refsPorCampo = {
+      direccion: refDireccion,
+      colonia: refColonia,
+      tipo: refTipo,
+      genero: refGenero,
+      habitacionesTotales: refHabitacionesTotales,
+      banos: refBanos,
+      roomies: refRoomies,
+      precio: refPrecio,
+      deposito: refDeposito,
+      fotos: refFotos,
+    }
     const primerError = ORDEN_CAMPOS.find((campo) => nuevosErrores[campo])
     if (primerError) {
-      refs[primerError].current?.focus()
+      refsPorCampo[primerError].current?.focus()
       return
     }
 
@@ -300,7 +309,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
         <BloqueFormulario titulo="Ubicación">
           <div className="grid gap-5 sm:grid-cols-2">
             <CampoFormulario
-              ref={refs.direccion}
+              ref={refDireccion}
               etiqueta="Dirección"
               placeholder="Calle y número, ej. Calle Los Pinos 145"
               autoComplete="street-address"
@@ -310,7 +319,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
             />
             {/* Texto libre con sugerencias: se puede escribir cualquier colonia */}
             <CampoFormulario
-              ref={refs.colonia}
+              ref={refColonia}
               etiqueta="Colonia"
               placeholder="Ej. La Aurora"
               list={idSugerenciasColonia}
@@ -330,7 +339,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
 
         {/* ---------- El espacio ---------- */}
         <BloqueFormulario titulo="El espacio">
-          <GrupoOpciones refGrupo={refs.tipo} titulo="Tipo de espacio" error={errores.tipo}>
+          <GrupoOpciones refGrupo={refTipo} titulo="Tipo de espacio" error={errores.tipo}>
             {Object.entries(TIPOS_PROPIEDAD).map(([clave, etiqueta]) => (
               <Chip
                 key={clave}
@@ -350,7 +359,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
             </p>
           )}
 
-          <GrupoOpciones refGrupo={refs.genero} titulo="¿Quién puede vivir ahí?" error={errores.genero}>
+          <GrupoOpciones refGrupo={refGenero} titulo="¿Quién puede vivir ahí?" error={errores.genero}>
             {Object.entries(GENEROS).map(([clave, etiqueta]) => (
               <Chip
                 key={clave}
@@ -385,7 +394,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
         <BloqueFormulario titulo="La casa" descripcion="Datos de toda la casa o el edificio, no solo del espacio en renta.">
           <div className="grid gap-5 sm:grid-cols-3">
             <CampoFormulario
-              ref={refs.habitacionesTotales}
+              ref={refHabitacionesTotales}
               etiqueta="Habitaciones"
               type="number"
               inputMode="numeric"
@@ -395,7 +404,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
               error={errores.habitacionesTotales}
             />
             <CampoFormulario
-              ref={refs.banos}
+              ref={refBanos}
               etiqueta="Baños"
               type="number"
               inputMode="numeric"
@@ -405,7 +414,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
               error={errores.banos}
             />
             <CampoFormulario
-              ref={refs.roomies}
+              ref={refRoomies}
               etiqueta="Roomies"
               type="number"
               inputMode="numeric"
@@ -435,7 +444,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
         <BloqueFormulario titulo="Renta y contrato">
           <div className="grid gap-5 sm:grid-cols-3">
             <CampoFormulario
-              ref={refs.precio}
+              ref={refPrecio}
               etiqueta="Renta mensual (MXN)"
               type="number"
               inputMode="numeric"
@@ -447,7 +456,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
               error={errores.precio}
             />
             <CampoFormulario
-              ref={refs.deposito}
+              ref={refDeposito}
               etiqueta="Depósito (MXN)"
               type="number"
               inputMode="numeric"
@@ -549,7 +558,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
                     <LuImagePlus className="h-6 w-6" aria-hidden="true" />
                     Agregar fotos
                     <input
-                      ref={refs.fotos}
+                      ref={refFotos}
                       type="file"
                       accept="image/*"
                       multiple
