@@ -17,11 +17,15 @@ export default function PropiedadesProvider({ children }) {
     setPropiedades((prev) => [nueva, ...prev])
   }
 
-  // El administrador aprueba o rechaza (lo usará PanelAdmin)
-  const cambiarEstado = (id, estado) => {
-    setPropiedades((prev) => prev.map((p) => (p.id === id ? { ...p, estado } : p)))
+    // El administrador aprueba o rechaza. Al rechazar, se guarda el motivo para el 2nd HOST.
+  const cambiarEstado = (id, estado, motivoRechazo = '') => {
+    setPropiedades((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, estado, motivoRechazo: estado === 'rejected' ? motivoRechazo : '' } : p
+      )
+    )
   }
-
+  
   return (
     <PropiedadesContext.Provider value={{ propiedades, cambiarDisponibilidad, agregarPropiedad, cambiarEstado }}>
       {children}

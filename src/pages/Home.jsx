@@ -19,7 +19,10 @@ const FILTROS_INICIALES = {
 
 // Opciones para ordenar los resultados
 const ORDENES = {
-  cercania: { etiqueta: 'Más cerca de CUCEI', comparar: (a, b) => a.distanciaKm - b.distanciaKm },
+  cercania: {
+    etiqueta: 'Más cerca de CUCEI',
+    comparar: (a, b) => (a.distanciaKm ?? Number.MAX_VALUE) - (b.distanciaKm ?? Number.MAX_VALUE),
+  },
   precio: { etiqueta: 'Menor precio', comparar: (a, b) => a.precio - b.precio },
   calificacion: { etiqueta: 'Mejor calificadas', comparar: (a, b) => (b.calificacion ?? 0) - (a.calificacion ?? 0) },
 }

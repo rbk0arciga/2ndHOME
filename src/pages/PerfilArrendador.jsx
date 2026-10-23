@@ -370,6 +370,11 @@ function ItemGestion({ propiedad, onCambiarDisponibilidad }) {
             </span>
             {NOTA_ESTADO[estado] && <span className="text-xs text-gray-600">{NOTA_ESTADO[estado]}</span>}
           </p>
+                    {estado === 'rejected' && propiedad.motivoRechazo && (
+            <p className="mt-2 rounded-xl bg-red-50 p-2.5 text-xs text-red-800">
+              <span className="font-semibold">Motivo:</span> {propiedad.motivoRechazo}
+            </p>
+          )}
         </div>
       </div>
 

@@ -119,8 +119,7 @@ export default function PropertyCard({ propiedad }) {
       {/* Imagen con etiquetas encima */}
       <div className="relative aspect-4/3 bg-home-orange-100">
         <FotoPropiedad src={imagenes?.[0]} titulo={titulo} />
-        <DistanciaCucei km={distanciaKm} />
-
+        {distanciaKm != null && <DistanciaCucei km={distanciaKm} />}
         {!disponible && (
           <span className="absolute left-3 top-3 rounded-full bg-gray-900/80 px-3 py-1 text-xs font-semibold text-white">
             Sin lugares por ahora

@@ -7,6 +7,7 @@ import PropertyCard from '../components/PropertyCard'
 import CampoFormulario from '../components/CampoFormulario'
 import { useSesion } from '../context/sesion'
 import { obtenerPropiedad, resenas } from '../data/mockData'
+import { usePropiedades } from '../context/propiedades'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -184,11 +185,9 @@ function FormularioPerfil({ perfil, onGuardar, onCancelar }) {
    Favoritos
    ========================================================== */
 function SeccionFavoritos({ idsFavoritos }) {
+    const { propiedades } = usePropiedades()
   // Solo se muestran las que siguen publicadas
-  const favoritos = idsFavoritos
-    .map(obtenerPropiedad)
-    .filter((propiedad) => propiedad?.estado === 'approved')
-
+  const favoritos = propiedades.filter((p) => idsFavoritos.includes(p.id) && p.estado === 'approved')
   return (
     <section aria-labelledby="titulo-favoritos">
       <h2 id="titulo-favoritos" className="text-xl font-bold text-gray-900">

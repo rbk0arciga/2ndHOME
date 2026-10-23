@@ -10,7 +10,7 @@ import Registro from './pages/Registro'
 import Chat from './pages/Chat'
 import PerfilEstudiante from './pages/PerfilEstudiante'
 import PerfilArrendador from './pages/PerfilArrendador'
-
+import PanelAdmin from './pages/PanelAdmin'
 // App temporal: se irá completando conforme construyamos las páginas
 function App() {
   return (
@@ -32,6 +32,7 @@ function App() {
               <Route path="/perfil-estudiante" element={<PerfilEstudiante />} />
               <Route path="/perfil-arrendador" element={<PerfilArrendador />} />
               <Route path="/perfil-arrendador/:id" element={<PerfilArrendador />} />
+              <Route path="/admin" element={<PanelAdmin />} />
             </Route>
           </Routes>
         </PropiedadesProvider>

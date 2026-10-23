@@ -46,8 +46,7 @@ export default function Login() {
   // Si ya hay sesión (por ejemplo, justo después de iniciarla), se envía a la
   // página que intentaba abrir antes del login, o al catálogo.
   if (usuario) {
-    return <Navigate to={location.state?.desde ?? '/'} replace />
-  }
+    return <Navigate to={location.state?.desde ?? (usuario.rol === 'admin' ? '/admin' : '/')} replace />  }
 
   // Al escribir en un campo con error, el mensaje desaparece
   const alCambiarCorreo = (e) => {

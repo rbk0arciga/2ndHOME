@@ -43,7 +43,6 @@ import {
 import { FaStar } from 'react-icons/fa'
 import Avatar from '../components/Avatar'
 import {
-  obtenerPropiedad,
   resenasDePropiedad,
   usuarios,
   TIPOS_PROPIEDAD,
@@ -59,7 +58,7 @@ import {
   direccionCompleta,
 } from '../data/mockData'
 import { useSesion } from '../context/sesion'
-
+import { usePropiedades } from '../context/propiedades'
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
 
@@ -212,12 +211,14 @@ function Encabezado({ propiedad }) {
           </span>
         )}
 
-        <span className="flex items-center gap-1.5 text-gray-800">
-          <LuFootprints className="h-4 w-4 text-home-orange-600" aria-hidden="true" />
-          <span>
-            <span className="font-semibold">{minutosAPie(distanciaKm)} min a pie</span> de CUCEI ({distanciaKm} km)
+        {distanciaKm != null && (
+          <span className="flex items-center gap-1.5 text-gray-800">
+            <LuFootprints className="h-4 w-4 text-home-orange-600" aria-hidden="true" />
+            <span>
+              <span className="font-semibold">{minutosAPie(distanciaKm)} min a pie</span> de CUCEI ({distanciaKm} km)
+            </span>
           </span>
-        </span>
+        )}
 
         <span className="rounded-full border border-home-orange-200 bg-home-orange-50 px-2.5 py-1 text-xs font-medium text-home-orange-900">
           {GENEROS[genero]}
@@ -337,8 +338,24 @@ function TarjetaAnfitrion({ arrendador }) {
    ========================================================== */
 function Mapa({ propiedad }) {
   const { titulo, distanciaKm } = propiedad
-  const { lat, lng } = propiedad.coordenadas
 
+  // Propiedades recién publicadas: aún no tienen coordenadas (con Firebase se obtendrán de la dirección)
+  if (!propiedad.coordenadas) {
+    return (
+      <section aria-labelledby="titulo-ubicacion" className="rounded-3xl border border-home-orange-200 bg-white p-5">
+        <h2 id="titulo-ubicacion" className="font-semibold text-gray-900">
+          Ubicación
+        </h2>
+        <p className="mt-3 flex items-start gap-2 text-sm text-gray-800">
+          <LuMapPin className="mt-0.5 h-4 w-4 shrink-0 text-home-orange-600" aria-hidden="true" />
+          {direccionCompleta(propiedad)}
+        </p>
+        <p className="mt-2 text-xs text-gray-600">El mapa aparecerá cuando se confirme la ubicación.</p>
+      </section>
+    )
+  }
+
+  const { lat, lng } = propiedad.coordenadas
   // Encuadre centrado en la propiedad, con margen pequeño para distinguir la calle
   const margen = 0.004
   const urlMapa = `https://www.openstreetmap.org/export/embed.html?bbox=${lng - margen},${lat - margen},${lng + margen},${lat + margen}&layer=mapnik&marker=${lat},${lng}`
@@ -596,9 +613,9 @@ function PropiedadNoEncontrada() {
    ========================================================== */
 export default function DetallePropiedad() {
   const { id } = useParams()
-  const propiedad = obtenerPropiedad(id)
-
-const { usuario } = useSesion()
+  const { propiedades } = usePropiedades()
+  const propiedad = propiedades.find((p) => p.id === id)
+  const { usuario } = useSesion()
   const esAdmin = usuario?.rol === 'admin'
   const esDueno = usuario?.id === propiedad?.arrendador.id
   // Solo las propiedades aprobadas son públicas.
