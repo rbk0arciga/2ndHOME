@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { LuArrowLeft, LuSend, LuMessageCircle, LuInfo, LuFlag } from 'react-icons/lu'
 import Avatar from '../components/Avatar'
 import ChatBubble from '../components/ChatBubble'
 import { useSesion } from '../context/sesion'
-import { conversaciones as conversacionesMock, usuarios, obtenerPropiedad } from '../data/mockData'
-
+import { conversaciones as conversacionesMock, usuarios, obtenerPropiedad, MOTIVOS_REPORTE } from '../data/mockData'
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { db } from '../firebase/config'
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
 
@@ -149,22 +150,73 @@ function ListaConversaciones({ conversaciones, usuario, seleccionadaId, onSelecc
 }
 
 /* ==========================================================
-   Reporte de conversación (con confirmación)
+   Reporte de conversación (con motivo)
    ========================================================== */
-function BarraReporte({ estado, onConfirmar, onCancelar }) {
+function BarraReporte({ estado, error, onConfirmar, onCancelar }) {
+  const [motivo, setMotivo] = useState('')
+  const [detalle, setDetalle] = useState('')
+  const [errorMotivo, setErrorMotivo] = useState('')
+  const nombreGrupo = useId()
+  const idDetalle = useId()
+
   if (estado === 'confirmando') {
+    const alEnviar = (e) => {
+      e.preventDefault()
+      if (!motivo) {
+        setErrorMotivo('Elige un motivo.')
+        return
+      }
+      onConfirmar({ motivo, descripcion: detalle.trim() })
+    }
+
     return (
-      <div role="alertdialog" aria-labelledby="texto-reporte" className="border-b border-home-orange-100 bg-home-orange-50 px-4 py-3 sm:px-5">
-        <p id="texto-reporte" className="text-sm text-gray-800">
-          ¿Reportar esta conversación? El equipo de 2nd HOME revisará los mensajes.
-        </p>
-        <div className="mt-2 flex gap-2">
+      <form onSubmit={alEnviar} noValidate className="space-y-3 border-b border-home-orange-100 bg-home-orange-50 px-4 py-3 sm:px-5">
+        <fieldset>
+          <legend className="text-sm font-semibold text-gray-900">¿Por qué reportas esta conversación?</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {Object.entries(MOTIVOS_REPORTE).map(([clave, etiqueta]) => (
+              <label key={clave} className="cursor-pointer">
+                <input
+                  type="radio"
+                  name={nombreGrupo}
+                  checked={motivo === clave}
+                  onChange={() => {
+                    setMotivo(clave)
+                    setErrorMotivo('')
+                  }}
+                  className="peer sr-only"
+                />
+                <span className="block rounded-full border border-home-orange-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 transition-colors hover:border-home-orange-400 peer-checked:border-home-orange-700 peer-checked:bg-home-orange-700 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-home-orange-500">
+                  {etiqueta}
+                </span>
+              </label>
+            ))}
+          </div>
+          {errorMotivo && <p className="mt-1.5 text-sm font-medium text-red-700">{errorMotivo}</p>}
+        </fieldset>
+
+        <div>
+          <label htmlFor={idDetalle} className="text-sm font-semibold text-gray-900">
+            Detalles <span className="font-normal text-gray-600">(opcional)</span>
+          </label>
+          <textarea
+            id={idDetalle}
+            rows={2}
+            value={detalle}
+            onChange={(e) => setDetalle(e.target.value)}
+            className="mt-1 w-full resize-y rounded-xl border-2 border-home-orange-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-home-orange-500 focus:outline-none"
+          />
+        </div>
+
+        <p className="text-xs text-gray-700">El equipo de 2nd HOME revisará los mensajes de esta conversación.</p>
+        {error && <p className="text-sm font-medium text-red-700">{error}</p>}
+
+        <div className="flex gap-2">
           <button
-            type="button"
-            onClick={onConfirmar}
+            type="submit"
             className={`rounded-full bg-home-orange-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-home-orange-800 ${ENFOQUE}`}
           >
-            Reportar
+            Enviar reporte
           </button>
           <button
             type="button"
@@ -174,7 +226,7 @@ function BarraReporte({ estado, onConfirmar, onCancelar }) {
             Cancelar
           </button>
         </div>
-      </div>
+      </form>
     )
   }
 
@@ -195,13 +247,32 @@ function BarraReporte({ estado, onConfirmar, onCancelar }) {
 function VentanaConversacion({ conversacion, usuario, onEnviar, onVolver }) {
   const [texto, setTexto] = useState('')
   const [estadoReporte, setEstadoReporte] = useState('ninguno') // 'ninguno' | 'confirmando' | 'enviado'
+  const [errorReporte, setErrorReporte] = useState('')
   const zonaMensajesRef = useRef(null)
   const campoRef = useRef(null)
 
   const contacto = contactoDe(conversacion, usuario)
   const propiedad = obtenerPropiedad(conversacion.propiedadId)
   const grupos = agruparPorDia(conversacion.mensajes)
-
+    const enviarReporte = async ({ motivo, descripcion }) => {
+    setErrorReporte('')
+    try {
+      await addDoc(collection(db, 'reportes'), {
+        tipo: 'conversacion',
+        motivo,
+        descripcion: descripcion || MOTIVOS_REPORTE[motivo],
+        reportadoPor: { id: usuario.id, nombre: usuario.nombre },
+        reportado: { id: contacto.id, nombre: contacto.nombre },
+        propiedadId: conversacion.propiedadId ?? null,
+        estado: 'abierto',
+        resolucion: '',
+        fecha: serverTimestamp(),
+      })
+      setEstadoReporte('enviado')
+    } catch {
+      setErrorReporte('No pudimos enviar el reporte. Revisa tu conexión e inténtalo de nuevo.')
+    }
+  }
   // Baja hasta el último mensaje al abrir la conversación y cada vez que llega uno nuevo
   useEffect(() => {
     const zona = zonaMensajesRef.current
@@ -268,10 +339,14 @@ function VentanaConversacion({ conversacion, usuario, onEnviar, onVolver }) {
         </button>
       </header>
 
-      <BarraReporte
+    <BarraReporte
         estado={estadoReporte}
-        onConfirmar={() => setEstadoReporte('enviado')}
-        onCancelar={() => setEstadoReporte('ninguno')}
+        error={errorReporte}
+        onConfirmar={enviarReporte}
+        onCancelar={() => {
+          setEstadoReporte('ninguno')
+          setErrorReporte('')
+        }}
       />
 
       {/* Mensajes */}

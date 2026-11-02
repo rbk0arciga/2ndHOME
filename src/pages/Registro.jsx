@@ -16,8 +16,7 @@ import {
   LuChevronRight,
 } from 'react-icons/lu'
 import CampoFormulario from '../components/CampoFormulario'
-import { usuarios } from '../data/mockData'
-
+import { useSesion } from '../context/sesion'
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
 const CLASE_ENLACE = `rounded font-semibold text-home-orange-800 underline underline-offset-4 hover:text-home-orange-900 ${ENFOQUE}`
@@ -64,6 +63,15 @@ function estadoCorreoEstudiante(correo) {
 }
 
 /* ---------- Validación completa al enviar ---------- */
+// Códigos de error de Firebase al crear la cuenta → mensaje para el usuario
+const MENSAJES_ERROR_REGISTRO = {
+  'auth/email-already-in-use': 'Ya existe una cuenta con este correo. Inicia sesión.',
+  'auth/invalid-email': 'Revisa el formato del correo.',
+  'auth/weak-password': 'La contraseña es muy débil. Usa al menos 6 caracteres.',
+  'auth/network-request-failed': 'No hay conexión con el servidor. Revisa tu internet.',
+  'permission-denied': 'No pudimos guardar tu perfil. Verifica que tu correo sea institucional.',
+}
+
 function validar(datos, rol) {
   const errores = {}
   const correo = datos.correo.trim().toLowerCase()
@@ -76,8 +84,6 @@ function validar(datos, rol) {
     errores.correo = 'Revisa el formato del correo.'
   } else if (rol === 'estudiante' && !correo.endsWith(DOMINIO_ESTUDIANTE)) {
     errores.correo = `Usa tu correo institucional, que termina en ${DOMINIO_ESTUDIANTE}.`
-  } else if (usuarios.some((u) => u.correo.toLowerCase() === correo)) {
-    errores.correo = 'Ya existe una cuenta con este correo. Inicia sesión.'
   }
 
   if (rol === 'estudiante' && !datos.carrera.trim()) {
@@ -171,23 +177,19 @@ function RegistroExitoso({ rol, correo }) {
           {esEstudiante ? (
             <>
               Enviamos un enlace de verificación a <span className="font-semibold text-gray-900">{correo}</span>.
-              Ábrelo para activar tu cuenta de 2nd GUEST y empezar a buscar dónde vivir.
+              Ábrelo para activar tu cuenta de 2nd GUEST. Si no lo ves, revisa el correo no deseado.
             </>
           ) : (
-            'Inicia sesión para publicar tu primera propiedad. Nuestro equipo la revisará antes de que aparezca en el catálogo.'
+            'Ya puedes publicar tu primera propiedad. Nuestro equipo la revisará antes de que aparezca en el catálogo.'
           )}
         </p>
 
         <Link
-          to="/login"
+          to={esEstudiante ? '/verificar-correo' : '/perfil-arrendador'}
           className={`mt-6 inline-flex h-12 items-center justify-center rounded-full bg-home-orange-700 px-6 font-semibold text-white transition-colors hover:bg-home-orange-800 ${ENFOQUE}`}
         >
-          Ir a iniciar sesión
+          {esEstudiante ? 'Continuar' : 'Ir a mi perfil'}
         </Link>
-
-        <p className="mt-6 text-xs text-gray-600">
-          Maqueta: el registro real se activará al conectar Firebase. Por ahora, entra con las cuentas de prueba.
-        </p>
       </div>
     </main>
   )
@@ -199,6 +201,7 @@ function RegistroExitoso({ rol, correo }) {
 function FormularioRegistro({ tipo }) {
   const { rol, nombre: nombreTipo } = TIPOS_CUENTA[tipo]
   const esEstudiante = rol === 'estudiante'
+  const { registrarse } = useSesion()
 
   const [datos, setDatos] = useState({
     nombre: '',
@@ -209,6 +212,7 @@ function FormularioRegistro({ tipo }) {
     confirmar: '',
   })
   const [errores, setErrores] = useState({})
+  const [errorGeneral, setErrorGeneral] = useState('')
   const [mostrarContrasena, setMostrarContrasena] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [registrado, setRegistrado] = useState(false)
@@ -227,11 +231,13 @@ function FormularioRegistro({ tipo }) {
     if (errores[campo]) setErrores((prev) => ({ ...prev, [campo]: undefined }))
   }
 
-  const alEnviar = (e) => {
+  const alEnviar = async (e) => {
     e.preventDefault()
+    setErrorGeneral('')
     const nuevosErrores = validar(datos, rol)
     setErrores(nuevosErrores)
 
+    // El objeto se arma aquí (en el evento), no durante el render
     const refsPorCampo = {
       nombre: refNombre,
       correo: refCorreo,
@@ -247,12 +253,21 @@ function FormularioRegistro({ tipo }) {
     }
 
     setEnviando(true)
-    // MAQUETA: con Firebase aquí irán createUserWithEmailAndPassword,
-    // sendEmailVerification (2nd GUESTS) y el guardado del perfil en Firestore.
-    setTimeout(() => {
-      setEnviando(false)
+    try {
+      await registrarse({ rol, ...datos })
       setRegistrado(true)
-    }, 900)
+    } catch (error) {
+      const mensaje = MENSAJES_ERROR_REGISTRO[error.code] ?? 'No pudimos crear la cuenta. Inténtalo de nuevo.'
+      // Si el correo ya existe, el error se muestra en ese campo
+      if (error.code === 'auth/email-already-in-use') {
+        setErrores((prev) => ({ ...prev, correo: mensaje }))
+        refCorreo.current?.focus()
+      } else {
+        setErrorGeneral(mensaje)
+      }
+    } finally {
+      setEnviando(false)
+    }
   }
 
   if (registrado) return <RegistroExitoso rol={rol} correo={datos.correo.trim()} />
@@ -294,7 +309,11 @@ function FormularioRegistro({ tipo }) {
               ? 'Encuentra alojamiento revisado cerca de CUCEI.'
               : 'Publica tu espacio para estudiantes de CUCEI.'}
           </p>
-
+          {errorGeneral && (
+            <p role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {errorGeneral}
+            </p>
+          )}
           <form onSubmit={alEnviar} noValidate className="mt-6 space-y-5">
             <CampoFormulario
               ref={refNombre}

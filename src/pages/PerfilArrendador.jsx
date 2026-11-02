@@ -455,11 +455,10 @@ function AnfitrionNoEncontrado() {
 /* ==========================================================
    Vista completa del perfil
    ========================================================== */
-function VistaPerfil({ idAnfitrion, esPropio }) {
-  // Propiedades compartidas: los cambios aquí se reflejan en el catálogo
+function VistaPerfil({ idAnfitrion, esPropio, usuarioSesion }) {  // Propiedades compartidas: los cambios aquí se reflejan en el catálogo
   const { propiedades, cambiarDisponibilidad, agregarPropiedad } = usePropiedades()
-  const anfitrion = obtenerAnfitrion(idAnfitrion, propiedades)
-
+  // En el perfil propio, los datos vienen de la sesión (Firestore); en los demás, de las propiedades
+  const anfitrion = esPropio ? usuarioSesion : obtenerAnfitrion(idAnfitrion, propiedades)
   // MAQUETA: el perfil editado vive solo en esta página. Con Firebase se guardará en Firestore.
   const [perfil, setPerfil] = useState(() => ({
     profesion: anfitrion?.profesion ?? '',
@@ -535,5 +534,12 @@ export default function PerfilArrendador() {
   const idAnfitrion = id ?? usuario.id
 
   // key: si se navega de un perfil a otro, la vista se reinicia con los datos correctos
-  return <VistaPerfil key={idAnfitrion} idAnfitrion={idAnfitrion} esPropio={idAnfitrion === usuario.id} />
+  return (
+    <VistaPerfil
+      key={idAnfitrion}
+      idAnfitrion={idAnfitrion}
+      esPropio={idAnfitrion === usuario.id}
+      usuarioSesion={usuario}
+    />
+  )
 }

@@ -557,6 +557,20 @@ export const consejos = [
   },
 ]
 
+// ---------- Reportes ----------
+export const TIPOS_REPORTE = {
+  conversacion: 'Conversación',
+  propiedad: 'Propiedad',
+  publicacion: 'Comunidad',
+}
+
+export const MOTIVOS_REPORTE = {
+  pideDinero: 'Pide dinero antes de visitar',
+  acoso: 'Lenguaje ofensivo o acoso',
+  informacionFalsa: 'Información falsa',
+  otro: 'Otro motivo',
+}
+
 // ---------- Funciones de ayuda 
 export const propiedadesAprobadas = propiedades.filter((p) => p.estado === 'approved')
 

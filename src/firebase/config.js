@@ -20,4 +20,5 @@ if (faltantes.length > 0) {
 
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app) // Inicio de sesión y registro
+auth.languageCode = 'es'
 export const db = getFirestore(app) // Base de datos (incluidas las fotos comprimidas)

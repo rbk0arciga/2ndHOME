@@ -11,6 +11,8 @@ import Chat from './pages/Chat'
 import PerfilEstudiante from './pages/PerfilEstudiante'
 import PerfilArrendador from './pages/PerfilArrendador'
 import PanelAdmin from './pages/PanelAdmin'
+import VerificarCorreo from './pages/VerificarCorreo'
+
 // App temporal: se irá completando conforme construyamos las páginas
 function App() {
   return (
@@ -23,7 +25,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/registro" element={<Registro />} />
             <Route path="/registro/:tipo" element={<Registro />} />
-
+            <Route path="/verificar-correo" element={<VerificarCorreo />} />
             {/* Rutas que requieren sesión */}
             <Route element={<RutaProtegida />}>
               <Route path="/" element={<Home />} />
@@ -32,8 +34,7 @@ function App() {
               <Route path="/perfil-estudiante" element={<PerfilEstudiante />} />
               <Route path="/perfil-arrendador" element={<PerfilArrendador />} />
               <Route path="/perfil-arrendador/:id" element={<PerfilArrendador />} />
-              <Route path="/admin" element={<PanelAdmin />} />
-            </Route>
+              <Route path="/admin/:seccion?" element={<PanelAdmin />} />            </Route>
           </Routes>
         </PropiedadesProvider>
       </SesionProvider>
