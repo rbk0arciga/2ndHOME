@@ -197,11 +197,13 @@ function MenuUsuario({ usuario, accion }) {
 }
 
 /* ---------- Navegación secundaria (Alojamiento, Comunidad) ---------- */
-function NavegacionSecundaria({ pathname }) {
-  return (
+function NavegacionSecundaria({ pathname, rol }) {
+  // Comunidad solo aparece para 2nd GUESTS y para el administrador
+  const secciones = SECCIONES.filter((s) => s.to !== '/comunidad' || rol === 'estudiante' || rol === 'admin')
+return (
     <nav aria-label="Secciones principales" className="px-4 pt-4 md:pt-6">
       <ul className="mx-auto flex max-w-sm gap-1 rounded-full border border-home-orange-200 bg-white p-1">
-        {SECCIONES.map(({ to, etiqueta, Icono }) => {
+        {secciones.map(({ to, etiqueta, Icono }) => {
           const activa = esSeccionActiva(to, pathname)
           return (
             <li key={to} className="flex-1">
@@ -259,7 +261,6 @@ export default function Navbar() {
         </div>
       </header>
 
-      {!enPaginaDeAcceso && <NavegacionSecundaria pathname={pathname} />}
-    </>
+      {!enPaginaDeAcceso && <NavegacionSecundaria pathname={pathname} rol={usuario?.rol} />}    </>
   )
 }

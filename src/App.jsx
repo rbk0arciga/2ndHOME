@@ -12,6 +12,7 @@ import PerfilEstudiante from './pages/PerfilEstudiante'
 import PerfilArrendador from './pages/PerfilArrendador'
 import PanelAdmin from './pages/PanelAdmin'
 import VerificarCorreo from './pages/VerificarCorreo'
+import Comunidad from './pages/Comunidad'
 
 // App temporal: se irá completando conforme construyamos las páginas
 function App() {
@@ -34,7 +35,9 @@ function App() {
               <Route path="/perfil-estudiante" element={<PerfilEstudiante />} />
               <Route path="/perfil-arrendador" element={<PerfilArrendador />} />
               <Route path="/perfil-arrendador/:id" element={<PerfilArrendador />} />
-              <Route path="/admin/:seccion?" element={<PanelAdmin />} />            </Route>
+              <Route path="/admin/:seccion?" element={<PanelAdmin />} />
+              <Route path="/comunidad" element={<Comunidad />} />
+            </Route>
           </Routes>
         </PropiedadesProvider>
       </SesionProvider>
