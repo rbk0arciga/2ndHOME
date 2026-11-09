@@ -208,6 +208,14 @@ export default function Login() {
           <LuUserPlus className="h-5 w-5" aria-hidden="true" />
           Crear cuenta
         </Link>
+        <p className="mt-6 text-center text-xs text-gray-600">
+          <Link
+            to="/aviso-de-privacidad"
+            className={`rounded underline underline-offset-4 hover:text-gray-900 ${ENFOQUE}`}
+          >
+            Aviso de privacidad
+          </Link>
+        </p> 
       </div>
     </main>
   )

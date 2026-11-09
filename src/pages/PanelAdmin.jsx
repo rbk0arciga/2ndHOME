@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
-import { LuHouse, LuUsers, LuFlag } from 'react-icons/lu'
+import { LuHouse, LuUsers, LuFlag, LuSettings } from 'react-icons/lu'
 import RevisionPropiedades from '../components/admin/RevisionPropiedades'
 import GestionUsuarios from '../components/admin/GestionUsuarios'
 import GestionReportes from '../components/admin/GestionReportes'
+import ConfiguracionAdmision from '../components/admin/ConfiguracionAdmision'
 import { ENFOQUE } from '../components/admin/estilos'
 import { useSesion } from '../context/sesion'
 import { usePropiedades } from '../context/propiedades'
@@ -14,6 +15,7 @@ const SECCIONES = [
   { clave: 'propiedades', etiqueta: 'Propiedades', Icono: LuHouse },
   { clave: 'usuarios', etiqueta: 'Usuarios', Icono: LuUsers },
   { clave: 'reportes', etiqueta: 'Reportes', Icono: LuFlag },
+  { clave: 'configuracion', etiqueta: 'Configuración', Icono: LuSettings },
 ]
 
 export default function PanelAdmin() {
@@ -84,6 +86,7 @@ export default function PanelAdmin() {
         {seccion === 'propiedades' && <RevisionPropiedades />}
         {seccion === 'usuarios' && <GestionUsuarios />}
         {seccion === 'reportes' && <GestionReportes />}
+        {seccion === 'configuracion' && <ConfiguracionAdmision />}
       </div>
     </main>
   )

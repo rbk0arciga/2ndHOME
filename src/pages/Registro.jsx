@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import {
   LuUserRound,
@@ -14,9 +14,12 @@ import {
   LuMailCheck,
   LuArrowLeft,
   LuChevronRight,
+  LuShieldCheck,
 } from 'react-icons/lu'
 import CampoFormulario from '../components/CampoFormulario'
+import DialogoAviso from '../components/DialogoAviso'
 import { useSesion } from '../context/sesion'
+
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
 const CLASE_ENLACE = `rounded font-semibold text-home-orange-800 underline underline-offset-4 hover:text-home-orange-900 ${ENFOQUE}`
@@ -47,7 +50,16 @@ const TIPOS_CUENTA = {
 }
 
 // Orden en que se revisan los campos (para llevar el cursor al primer error)
-const ORDEN_CAMPOS = ['nombre', 'correo', 'carrera', 'telefono', 'contrasena', 'confirmar']
+const ORDEN_CAMPOS = ['nombre', 'correo', 'carrera', 'telefono', 'contrasena', 'confirmar', 'aviso']
+
+// Códigos de error de Firebase al crear la cuenta → mensaje para el usuario
+const MENSAJES_ERROR_REGISTRO = {
+  'auth/email-already-in-use': 'Ya existe una cuenta con este correo. Inicia sesión.',
+  'auth/invalid-email': 'Revisa el formato del correo.',
+  'auth/weak-password': 'La contraseña es muy débil. Usa al menos 6 caracteres.',
+  'auth/network-request-failed': 'No hay conexión con el servidor. Revisa tu internet.',
+  'permission-denied': 'No pudimos guardar tu perfil. Verifica que tu correo sea institucional y que aceptaste el aviso de privacidad.',
+}
 
 /* ---------- Estado del correo del 2nd GUEST mientras escribe ---------- */
 // 'neutral': aún no escribe @ o va escribiendo el dominio correcto ("@alum...")
@@ -63,15 +75,6 @@ function estadoCorreoEstudiante(correo) {
 }
 
 /* ---------- Validación completa al enviar ---------- */
-// Códigos de error de Firebase al crear la cuenta → mensaje para el usuario
-const MENSAJES_ERROR_REGISTRO = {
-  'auth/email-already-in-use': 'Ya existe una cuenta con este correo. Inicia sesión.',
-  'auth/invalid-email': 'Revisa el formato del correo.',
-  'auth/weak-password': 'La contraseña es muy débil. Usa al menos 6 caracteres.',
-  'auth/network-request-failed': 'No hay conexión con el servidor. Revisa tu internet.',
-  'permission-denied': 'No pudimos guardar tu perfil. Verifica que tu correo sea institucional.',
-}
-
 function validar(datos, rol) {
   const errores = {}
   const correo = datos.correo.trim().toLowerCase()
@@ -101,6 +104,10 @@ function validar(datos, rol) {
     errores.confirmar = 'Las contraseñas no coinciden.'
   }
 
+  if (!datos.aceptaAviso) {
+    errores.aviso = 'Para crear tu cuenta, lee y acepta el aviso de privacidad.'
+  }
+
   return errores
 }
 
@@ -108,6 +115,8 @@ function validar(datos, rol) {
    /registro: elegir tipo de cuenta
    ========================================================== */
 function SeleccionTipoCuenta() {
+  const [avisoAbierto, setAvisoAbierto] = useState(false)
+
   return (
     <main className="px-4 pb-16 pt-8 md:pt-16">
       <div className="mx-auto max-w-2xl text-center">
@@ -136,12 +145,26 @@ function SeleccionTipoCuenta() {
         ))}
       </ul>
 
-      <p className="mt-8 text-center text-sm text-gray-700">
+      {/* Aviso de privacidad visible desde que se elige el tipo de cuenta */}
+      <p className="mx-auto mt-6 flex max-w-2xl items-start justify-center gap-2 text-center text-sm text-gray-700">
+        <LuShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-home-orange-600" aria-hidden="true" />
+        <span>
+          Al crear una cuenta aceptas nuestro{' '}
+          <button type="button" onClick={() => setAvisoAbierto(true)} className={CLASE_ENLACE}>
+            aviso de privacidad
+          </button>
+          .
+        </span>
+      </p>
+
+      <p className="mt-6 text-center text-sm text-gray-700">
         ¿Ya tienes cuenta?{' '}
         <Link to="/login" className={CLASE_ENLACE}>
           Inicia sesión
         </Link>
       </p>
+
+      <DialogoAviso abierto={avisoAbierto} onCerrar={() => setAvisoAbierto(false)} />
     </main>
   )
 }
@@ -210,12 +233,15 @@ function FormularioRegistro({ tipo }) {
     telefono: '',
     contrasena: '',
     confirmar: '',
+    aceptaAviso: false,
   })
   const [errores, setErrores] = useState({})
   const [errorGeneral, setErrorGeneral] = useState('')
   const [mostrarContrasena, setMostrarContrasena] = useState(false)
+  const [avisoAbierto, setAvisoAbierto] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [registrado, setRegistrado] = useState(false)
+  const idAviso = useId()
 
   // Referencias para llevar el cursor al primer campo con error
   const refNombre = useRef(null)
@@ -224,11 +250,19 @@ function FormularioRegistro({ tipo }) {
   const refTelefono = useRef(null)
   const refContrasena = useRef(null)
   const refConfirmar = useRef(null)
+  const refAviso = useRef(null)
 
   // Actualiza un campo y borra su error en cuanto el usuario lo corrige
   const actualizar = (campo, valor) => {
     setDatos((prev) => ({ ...prev, [campo]: valor }))
     if (errores[campo]) setErrores((prev) => ({ ...prev, [campo]: undefined }))
+  }
+
+  // "Acepto el aviso" en la ventana marca la casilla y cierra la ventana
+  const aceptarAviso = () => {
+    setDatos((prev) => ({ ...prev, aceptaAviso: true }))
+    setErrores((prev) => ({ ...prev, aviso: undefined }))
+    setAvisoAbierto(false)
   }
 
   const alEnviar = async (e) => {
@@ -245,6 +279,7 @@ function FormularioRegistro({ tipo }) {
       telefono: refTelefono,
       contrasena: refContrasena,
       confirmar: refConfirmar,
+      aviso: refAviso,
     }
     const primerError = ORDEN_CAMPOS.find((campo) => nuevosErrores[campo])
     if (primerError) {
@@ -309,11 +344,13 @@ function FormularioRegistro({ tipo }) {
               ? 'Encuentra alojamiento revisado cerca de CUCEI.'
               : 'Publica tu espacio para estudiantes de CUCEI.'}
           </p>
+
           {errorGeneral && (
             <p role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
               {errorGeneral}
             </p>
           )}
+
           <form onSubmit={alEnviar} noValidate className="mt-6 space-y-5">
             <CampoFormulario
               ref={refNombre}
@@ -364,7 +401,7 @@ function FormularioRegistro({ tipo }) {
                 Icono={LuPhone}
                 value={datos.telefono}
                 onChange={(e) => actualizar('telefono', e.target.value)}
-                ayuda="10 dígitos."
+                ayuda="10 dígitos. No se muestra a otros usuarios."
                 error={errores.telefono}
               />
             )}
@@ -392,6 +429,44 @@ function FormularioRegistro({ tipo }) {
               error={errores.confirmar}
             />
 
+            {/* Aceptación del aviso de privacidad */}
+            <div>
+              <div
+                className={`flex items-start gap-3 rounded-2xl border-2 p-4 ${
+                  errores.aviso ? 'border-red-600 bg-red-50' : 'border-transparent bg-home-orange-50'
+                }`}
+              >
+                <input
+                  ref={refAviso}
+                  id={idAviso}
+                  type="checkbox"
+                  checked={datos.aceptaAviso}
+                  onChange={(e) => actualizar('aceptaAviso', e.target.checked)}
+                  aria-invalid={errores.aviso ? 'true' : undefined}
+                  aria-describedby={errores.aviso ? `${idAviso}-error` : `${idAviso}-ayuda`}
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-home-orange-600"
+                />
+                <div className="text-sm">
+                  <label htmlFor={idAviso} className="cursor-pointer font-semibold text-gray-900">
+                    He leído y acepto el aviso de privacidad
+                  </label>
+                  <p id={`${idAviso}-ayuda`} className="mt-1 text-gray-700">
+                    {esEstudiante
+                      ? 'Explica qué datos pedimos, para qué los usamos y qué ven los 2nd HOSTS de tu perfil.'
+                      : 'Explica qué datos pedimos y cómo cuidamos los documentos que te pediremos antes de publicar: tu identificación oficial y un comprobante de domicilio.'}
+                  </p>
+                  <button type="button" onClick={() => setAvisoAbierto(true)} className={`mt-2 ${CLASE_ENLACE}`}>
+                    Leer el aviso de privacidad
+                  </button>
+                </div>
+              </div>
+              {errores.aviso && (
+                <p id={`${idAviso}-error`} className="mt-1.5 text-sm font-medium text-red-700">
+                  {errores.aviso}
+                </p>
+              )}
+            </div>
+
             <button
               type="submit"
               disabled={enviando}
@@ -410,6 +485,8 @@ function FormularioRegistro({ tipo }) {
           </p>
         </div>
       </div>
+
+      <DialogoAviso abierto={avisoAbierto} onCerrar={() => setAvisoAbierto(false)} onAceptar={aceptarAviso} />
     </main>
   )
 }

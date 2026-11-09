@@ -11,6 +11,7 @@ import {
 import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
 import { SesionContext } from './sesion'
+import { VERSION_AVISO } from '../utils/avisoPrivacidad'
 
 // Mes actual como "2026-10" (mismo formato que usan los perfiles)
 function anioMesActual() {
@@ -85,6 +86,8 @@ export default function SesionProvider({ children }) {
       estado: 'activa',
       miembroDesde: desde,
       creadoEn: serverTimestamp(),
+            // Qué versión del aviso de privacidad aceptó y cuándo
+      avisoAceptado: { version: VERSION_AVISO, aceptadoEn: serverTimestamp() },
       ...datosPorRol,
     })
 
