@@ -8,10 +8,11 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
 } from 'firebase/auth'
-import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, onSnapshot, setDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
 import { SesionContext } from './sesion'
 import { VERSION_AVISO } from '../utils/avisoPrivacidad'
+import { guardarDocumento } from '../utils/documentos'
 
 // Mes actual como "2026-10" (mismo formato que usan los perfiles)
 function anioMesActual() {
@@ -67,31 +68,59 @@ export default function SesionProvider({ children }) {
   // El resto de la app recibe un solo objeto con el perfil y el estado de verificación
   const usuario = usuarioAuth && perfil ? { ...perfil, correoVerificado } : null
 
-  // Crea la cuenta, guarda el perfil y, si es 2nd GUEST, envía el correo de verificación.
-  // Si algo falla, lanza el error de Firebase para que el formulario muestre el mensaje.
-  const registrarse = async ({ rol, nombre, correo, contrasena, carrera, telefono }) => {
+  // Crea la cuenta y guarda el perfil. Los 2nd GUESTS (incluidos los aspirantes) reciben el correo
+  // de verificación. Si algo falla, lanza el error de Firebase para que el formulario muestre el mensaje.
+  const registrarse = async ({
+    rol,
+    nombre,
+    correo,
+    contrasena,
+    carrera,
+    telefono,
+    aspirante = false,
+    vigenteHasta = null, // Fecha (Date) en que vence la cuenta de aspirante
+    ficha = null, // Ficha de admisión ya preparada (solo aspirantes)
+  }) => {
     const credencial = await createUserWithEmailAndPassword(auth, correo.trim(), contrasena)
+    const uid = credencial.user.uid
     await updateProfile(credencial.user, { displayName: nombre.trim() })
 
     const desde = anioMesActual()
-    const datosPorRol =
-      rol === 'estudiante'
-        ? { carrera: carrera.trim(), favoritos: [], historial: [] }
-        : { telefono: telefono.replace(/\D/g, ''), anfitrionDesde: desde }
+    let datosPorRol
+    if (rol === 'estudiante') {
+      datosPorRol = { carrera: carrera.trim(), favoritos: [], historial: [], aspirante }
+      if (aspirante) {
+        datosPorRol.vigenteHasta = Timestamp.fromDate(vigenteHasta)
+        datosPorRol.fichaEstado = 'sin_enviar' // Pasa a "en_revision" en cuanto se sube la ficha
+      }
+    } else {
+      datosPorRol = { telefono: telefono.replace(/\D/g, ''), anfitrionDesde: desde }
+    }
 
-    await setDoc(doc(db, 'usuarios', credencial.user.uid), {
+    await setDoc(doc(db, 'usuarios', uid), {
       nombre: nombre.trim(),
       correo: credencial.user.email,
       rol,
       estado: 'activa',
       miembroDesde: desde,
       creadoEn: serverTimestamp(),
-            // Qué versión del aviso de privacidad aceptó y cuándo
+      // Qué versión del aviso de privacidad aceptó y cuándo
       avisoAceptado: { version: VERSION_AVISO, aceptadoEn: serverTimestamp() },
       ...datosPorRol,
     })
 
     if (rol === 'estudiante') await sendEmailVerification(credencial.user)
+
+    // La ficha se sube después de crear el perfil. Si falla, la cuenta ya existe
+    // y el aspirante puede volver a subirla desde la pantalla de revisión.
+    if (aspirante && ficha) {
+      try {
+        await guardarDocumento(uid, 'fichaAdmision', ficha)
+        await updateDoc(doc(db, 'usuarios', uid), { fichaEstado: 'en_revision' })
+      } catch (error) {
+        console.error('No se pudo subir la ficha de admisión:', error.code)
+      }
+    }
   }
 
   // Devuelve {} si todo salió bien, o { error: código de Firebase }

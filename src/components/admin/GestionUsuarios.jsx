@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
 import { LuSearch, LuX, LuLoader } from 'react-icons/lu'
 import Avatar from '../Avatar'
+import EtiquetaAspirante from '../EtiquetaAspirante'
 import Pestanas from './Pestanas'
 import FormularioMotivo from './FormularioMotivo'
 import {
@@ -47,6 +48,7 @@ function FilaUsuario({ cuenta, numPropiedades, reportesAbiertos, onSuspender, on
                   Suspendida
                 </span>
               )}
+             {cuenta.aspirante && <EtiquetaAspirante />}
             </div>
             <p className="mt-0.5 text-sm text-gray-700 wrap-anywhere">{correo}</p>
             <p className="mt-1 text-sm text-gray-600">

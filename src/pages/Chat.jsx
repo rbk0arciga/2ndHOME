@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { LuArrowLeft, LuSend, LuMessageCircle, LuInfo, LuFlag } from 'react-icons/lu'
 import Avatar from '../components/Avatar'
 import ChatBubble from '../components/ChatBubble'
+import EtiquetaAspirante from '../components/EtiquetaAspirante'
 import { useSesion } from '../context/sesion'
 import { conversaciones as conversacionesMock, usuarios, obtenerPropiedad, MOTIVOS_REPORTE } from '../data/mockData'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
@@ -64,11 +65,12 @@ function agruparPorDia(mensajes) {
 function contactoDe(conversacion, usuario) {
   if (usuario.rol === 'arrendador') {
     const estudiante = usuarios.find((u) => u.id === conversacion.estudianteId)
-    return {
-      id: conversacion.estudianteId,
-      nombre: estudiante?.nombre ?? '2nd GUEST',
-      avatar: estudiante?.avatar,
-    }
+      return {
+        id: conversacion.estudianteId,
+        nombre: estudiante?.nombre ?? '2nd GUEST',
+        avatar: estudiante?.avatar,
+        aspirante: estudiante?.aspirante ?? false,
+      }
   }
   return conversacion.arrendador
 }
@@ -127,6 +129,12 @@ function ListaConversaciones({ conversaciones, usuario, seleccionadaId, onSelecc
                   {ultimo && <span className="shrink-0 text-xs text-gray-600">{fechaCorta(ultimo.fecha)}</span>}
                 </span>
                 <span className="block truncate text-xs text-home-orange-800">{propiedad?.titulo}</span>
+                  {contacto.aspirante && (
+                    <span className="mt-1 block">
+                      <EtiquetaAspirante />
+                    </span>
+                  )}
+                
                 <span className="mt-0.5 flex items-center gap-2">
                   <span className={`truncate text-sm ${tieneNoLeidos ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
                     {ultimo
@@ -348,6 +356,13 @@ function VentanaConversacion({ conversacion, usuario, onEnviar, onVolver }) {
           setErrorReporte('')
         }}
       />
+
+      {/* Leyenda para el 2nd HOST cuando le escribe un aspirante */}
+      {contacto.aspirante && usuario.rol === 'arrendador' && (
+        <div className="border-b border-home-orange-100 bg-white px-4 py-3 sm:px-5">
+          <EtiquetaAspirante detalle />
+        </div>
+      )}
 
       {/* Mensajes */}
       <div ref={zonaMensajesRef} className="min-h-0 flex-1 overflow-y-auto bg-home-orange-50 px-3 py-4 sm:px-5">

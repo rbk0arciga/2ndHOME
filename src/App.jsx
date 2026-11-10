@@ -14,6 +14,7 @@ import PanelAdmin from './pages/PanelAdmin'
 import VerificarCorreo from './pages/VerificarCorreo'
 import Comunidad from './pages/Comunidad'
 import AvisoPrivacidad from './pages/AvisoPrivacidad'
+import VerificacionPendiente from './pages/VerificacionPendiente'
 
 // App temporal: se irá completando conforme construyamos las páginas
 function App() {
@@ -29,6 +30,7 @@ function App() {
             <Route path="/registro/:tipo" element={<Registro />} />
             <Route path="/aviso-de-privacidad" element={<AvisoPrivacidad />} />
             <Route path="/verificar-correo" element={<VerificarCorreo />} />
+            <Route path="/verificacion-pendiente" element={<VerificacionPendiente />} />
             {/* Rutas que requieren sesión */}
             <Route element={<RutaProtegida />}>
               <Route path="/" element={<Home />} />

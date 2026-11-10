@@ -18,7 +18,10 @@ import {
 } from 'react-icons/lu'
 import CampoFormulario from '../components/CampoFormulario'
 import DialogoAviso from '../components/DialogoAviso'
+import SubirDocumento from '../components/SubirDocumento'
 import { useSesion } from '../context/sesion'
+import { usePeriodoAdmision } from '../hooks/usePeriodoAdmision'
+import { formatoFechaLarga } from '../firebase/admision'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -37,7 +40,7 @@ const TIPOS_CUENTA = {
     rol: 'estudiante',
     nombre: '2nd GUEST',
     titulo: 'Soy 2nd GUEST',
-    descripcion: 'Soy estudiante y busco dónde vivir cerca de CUCEI.',
+    descripcion: 'Soy estudiante o aspirante y busco dónde vivir cerca de CUCEI.',
     Icono: LuGraduationCap,
   },
   host: {
@@ -50,7 +53,7 @@ const TIPOS_CUENTA = {
 }
 
 // Orden en que se revisan los campos (para llevar el cursor al primer error)
-const ORDEN_CAMPOS = ['nombre', 'correo', 'carrera', 'telefono', 'contrasena', 'confirmar', 'aviso']
+const ORDEN_CAMPOS = ['nombre', 'correo', 'carrera', 'ficha', 'telefono', 'contrasena', 'confirmar', 'aviso']
 
 // Códigos de error de Firebase al crear la cuenta → mensaje para el usuario
 const MENSAJES_ERROR_REGISTRO = {
@@ -58,10 +61,11 @@ const MENSAJES_ERROR_REGISTRO = {
   'auth/invalid-email': 'Revisa el formato del correo.',
   'auth/weak-password': 'La contraseña es muy débil. Usa al menos 6 caracteres.',
   'auth/network-request-failed': 'No hay conexión con el servidor. Revisa tu internet.',
-  'permission-denied': 'No pudimos guardar tu perfil. Verifica que tu correo sea institucional y que aceptaste el aviso de privacidad.',
+  'permission-denied':
+    'No pudimos guardar tu perfil. Revisa que tu correo sea el correcto y, si eres aspirante, que el registro de aspirantes siga abierto.',
 }
 
-/* ---------- Estado del correo del 2nd GUEST mientras escribe ---------- */
+/* ---------- Estado del correo institucional mientras se escribe ---------- */
 // 'neutral': aún no escribe @ o va escribiendo el dominio correcto ("@alum...")
 // 'valido': termina en @alumnos.udg.mx
 // 'invalido': escribió otro dominio
@@ -74,8 +78,16 @@ function estadoCorreoEstudiante(correo) {
   return 'invalido'
 }
 
+/* ---------- Texto de la opción "aspirante" según el periodo de admisión ---------- */
+function textoOpcionAspirante(estado, periodo) {
+  if (estado === 'abierta') return `Registro con correo personal abierto hasta el ${formatoFechaLarga(periodo.fin)}.`
+  if (estado === 'proxima') return `Disponible a partir del ${formatoFechaLarga(periodo.inicio)}.`
+  if (estado === 'cerrada') return 'El registro de aspirantes de este periodo ya cerró.'
+  return 'Por ahora no está disponible.'
+}
+
 /* ---------- Validación completa al enviar ---------- */
-function validar(datos, rol) {
+function validar(datos, rol, esAspirante, ficha) {
   const errores = {}
   const correo = datos.correo.trim().toLowerCase()
 
@@ -85,13 +97,17 @@ function validar(datos, rol) {
     errores.correo = 'Escribe tu correo.'
   } else if (!FORMATO_CORREO.test(correo)) {
     errores.correo = 'Revisa el formato del correo.'
-  } else if (rol === 'estudiante' && !correo.endsWith(DOMINIO_ESTUDIANTE)) {
+  } else if (rol === 'estudiante' && !esAspirante && !correo.endsWith(DOMINIO_ESTUDIANTE)) {
     errores.correo = `Usa tu correo institucional, que termina en ${DOMINIO_ESTUDIANTE}.`
+  } else if (esAspirante && correo.endsWith(DOMINIO_ESTUDIANTE)) {
+    errores.correo = 'Ese es un correo institucional: elige "Sí, ya lo tengo".'
   }
 
   if (rol === 'estudiante' && !datos.carrera.trim()) {
-    errores.carrera = 'Escribe tu carrera.'
+    errores.carrera = esAspirante ? 'Escribe la carrera a la que fuiste admitido.' : 'Escribe tu carrera.'
   }
+
+  if (esAspirante && !ficha) errores.ficha = 'Sube tu ficha de admisión.'
 
   if (rol === 'arrendador' && datos.telefono.replace(/\D/g, '').length !== 10) {
     errores.telefono = 'El teléfono debe tener 10 dígitos.'
@@ -172,7 +188,7 @@ function SeleccionTipoCuenta() {
 /* ==========================================================
    Pantalla de éxito
    ========================================================== */
-function RegistroExitoso({ rol, correo }) {
+function RegistroExitoso({ rol, correo, aspirante }) {
   const tituloRef = useRef(null)
 
   // Lleva el foco al título para que los lectores de pantalla anuncien el cambio
@@ -181,6 +197,21 @@ function RegistroExitoso({ rol, correo }) {
   }, [])
 
   const esEstudiante = rol === 'estudiante'
+
+  let texto = 'Ya puedes publicar tu primera propiedad. Nuestro equipo la revisará antes de que aparezca en el catálogo.'
+  if (esEstudiante) {
+    texto = aspirante ? (
+      <>
+        Enviamos un enlace de verificación a <span className="font-semibold text-gray-900">{correo}</span>. Ábrelo y
+        después revisaremos tu ficha de admisión. Si no ves el correo, revisa la carpeta de no deseados.
+      </>
+    ) : (
+      <>
+        Enviamos un enlace de verificación a <span className="font-semibold text-gray-900">{correo}</span>. Ábrelo para
+        activar tu cuenta de 2nd GUEST. Si no lo ves, revisa la carpeta de no deseados.
+      </>
+    )
+  }
 
   return (
     <main className="px-4 pb-16 pt-8 md:pt-12">
@@ -196,16 +227,7 @@ function RegistroExitoso({ rol, correo }) {
         <h1 ref={tituloRef} tabIndex={-1} className="mt-5 text-2xl font-bold text-gray-900 focus:outline-none">
           {esEstudiante ? 'Revisa tu correo' : 'Tu cuenta de 2nd HOST está lista'}
         </h1>
-        <p className="mt-2 text-gray-700">
-          {esEstudiante ? (
-            <>
-              Enviamos un enlace de verificación a <span className="font-semibold text-gray-900">{correo}</span>.
-              Ábrelo para activar tu cuenta de 2nd GUEST. Si no lo ves, revisa el correo no deseado.
-            </>
-          ) : (
-            'Ya puedes publicar tu primera propiedad. Nuestro equipo la revisará antes de que aparezca en el catálogo.'
-          )}
-        </p>
+        <p className="mt-2 text-gray-700">{texto}</p>
 
         <Link
           to={esEstudiante ? '/verificar-correo' : '/perfil-arrendador'}
@@ -219,12 +241,41 @@ function RegistroExitoso({ rol, correo }) {
 }
 
 /* ==========================================================
+   Opción "¿Ya tienes tu correo institucional?"
+   ========================================================== */
+function OpcionCorreo({ nombre, checked, disabled = false, onChange, titulo, descripcion }) {
+  return (
+    <label
+      className={`flex items-start gap-3 rounded-2xl border-2 p-3 transition-colors has-checked:border-home-orange-700 has-checked:bg-home-orange-50 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-home-orange-500 ${
+        disabled
+          ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-70'
+          : 'cursor-pointer border-home-orange-200 bg-white hover:border-home-orange-400'
+      }`}
+    >
+      <input
+        type="radio"
+        name={nombre}
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        className="mt-1 h-4 w-4 shrink-0 accent-home-orange-600"
+      />
+      <span>
+        <span className="block text-sm font-semibold text-gray-900">{titulo}</span>
+        <span className="block text-xs text-gray-700">{descripcion}</span>
+      </span>
+    </label>
+  )
+}
+
+/* ==========================================================
    /registro/guest y /registro/host: formulario
    ========================================================== */
 function FormularioRegistro({ tipo }) {
   const { rol, nombre: nombreTipo } = TIPOS_CUENTA[tipo]
   const esEstudiante = rol === 'estudiante'
   const { registrarse } = useSesion()
+  const { periodo, estado: estadoVentana } = usePeriodoAdmision()
 
   const [datos, setDatos] = useState({
     nombre: '',
@@ -235,6 +286,8 @@ function FormularioRegistro({ tipo }) {
     confirmar: '',
     aceptaAviso: false,
   })
+  const [esAspirante, setEsAspirante] = useState(false)
+  const [ficha, setFicha] = useState(null)
   const [errores, setErrores] = useState({})
   const [errorGeneral, setErrorGeneral] = useState('')
   const [mostrarContrasena, setMostrarContrasena] = useState(false)
@@ -242,20 +295,29 @@ function FormularioRegistro({ tipo }) {
   const [enviando, setEnviando] = useState(false)
   const [registrado, setRegistrado] = useState(false)
   const idAviso = useId()
+  const nombreOpcionCorreo = useId()
 
   // Referencias para llevar el cursor al primer campo con error
   const refNombre = useRef(null)
   const refCorreo = useRef(null)
   const refCarrera = useRef(null)
+  const refFicha = useRef(null)
   const refTelefono = useRef(null)
   const refContrasena = useRef(null)
   const refConfirmar = useRef(null)
   const refAviso = useRef(null)
 
+  const aspiranteDisponible = estadoVentana === 'abierta'
+
   // Actualiza un campo y borra su error en cuanto el usuario lo corrige
   const actualizar = (campo, valor) => {
     setDatos((prev) => ({ ...prev, [campo]: valor }))
     if (errores[campo]) setErrores((prev) => ({ ...prev, [campo]: undefined }))
+  }
+
+  const cambiarModo = (aspirante) => {
+    setEsAspirante(aspirante)
+    setErrores((prev) => ({ ...prev, correo: undefined, carrera: undefined, ficha: undefined }))
   }
 
   // "Acepto el aviso" en la ventana marca la casilla y cierra la ventana
@@ -268,7 +330,7 @@ function FormularioRegistro({ tipo }) {
   const alEnviar = async (e) => {
     e.preventDefault()
     setErrorGeneral('')
-    const nuevosErrores = validar(datos, rol)
+    const nuevosErrores = validar(datos, rol, esAspirante, ficha)
     setErrores(nuevosErrores)
 
     // El objeto se arma aquí (en el evento), no durante el render
@@ -276,6 +338,7 @@ function FormularioRegistro({ tipo }) {
       nombre: refNombre,
       correo: refCorreo,
       carrera: refCarrera,
+      ficha: refFicha,
       telefono: refTelefono,
       contrasena: refContrasena,
       confirmar: refConfirmar,
@@ -287,9 +350,21 @@ function FormularioRegistro({ tipo }) {
       return
     }
 
+    // La ventana pudo cerrarse mientras se llenaba el formulario
+    if (esAspirante && !aspiranteDisponible) {
+      setErrorGeneral('El registro de aspirantes no está abierto en este momento.')
+      return
+    }
+
     setEnviando(true)
     try {
-      await registrarse({ rol, ...datos })
+      await registrarse({
+        rol,
+        ...datos,
+        aspirante: esAspirante,
+        vigenteHasta: esAspirante ? periodo.fin : null,
+        ficha: esAspirante ? ficha : null,
+      })
       setRegistrado(true)
     } catch (error) {
       const mensaje = MENSAJES_ERROR_REGISTRO[error.code] ?? 'No pudimos crear la cuenta. Inténtalo de nuevo.'
@@ -305,14 +380,36 @@ function FormularioRegistro({ tipo }) {
     }
   }
 
-  if (registrado) return <RegistroExitoso rol={rol} correo={datos.correo.trim()} />
+  if (registrado) return <RegistroExitoso rol={rol} correo={datos.correo.trim()} aspirante={esAspirante} />
 
-  // Validación visual del dominio mientras se escribe (solo 2nd GUESTS)
-  const estadoCorreo = esEstudiante ? estadoCorreoEstudiante(datos.correo) : 'neutral'
+  // Validación visual del dominio mientras se escribe (solo 2nd GUESTS con correo institucional)
+  const validarDominio = esEstudiante && !esAspirante
+  const estadoCorreo = validarDominio ? estadoCorreoEstudiante(datos.correo) : 'neutral'
   const errorCorreo =
     errores.correo ||
     (estadoCorreo === 'invalido' ? `Solo se aceptan correos que terminan en ${DOMINIO_ESTUDIANTE}.` : undefined)
   const exitoCorreo = estadoCorreo === 'valido' ? 'Correo institucional válido' : undefined
+
+  let etiquetaCorreo = 'Correo'
+  let ayudaCorreo = 'Puedes usar cualquier correo personal.'
+  if (esEstudiante && esAspirante) {
+    etiquetaCorreo = 'Correo personal'
+    ayudaCorreo = `Te enviaremos un enlace para verificarlo. Antes del ${formatoFechaLarga(
+      periodo.fin
+    )} deberás cambiarlo por tu correo institucional.`
+  } else if (esEstudiante) {
+    etiquetaCorreo = 'Correo institucional'
+    ayudaCorreo = `Solo se aceptan correos que terminan en ${DOMINIO_ESTUDIANTE}.`
+  }
+
+  let ayudaAviso = 'Explica qué datos pedimos, para qué los usamos y qué ven los 2nd HOSTS de tu perfil.'
+  if (!esEstudiante) {
+    ayudaAviso =
+      'Explica qué datos pedimos y cómo cuidamos los documentos que te pediremos antes de publicar: tu identificación oficial y un comprobante de domicilio.'
+  } else if (esAspirante) {
+    ayudaAviso =
+      'Explica cómo cuidamos tu ficha de admisión y que los 2nd HOSTS verán que eres aspirante de primer ingreso.'
+  }
 
   const botonVerContrasena = (
     <button
@@ -352,6 +449,30 @@ function FormularioRegistro({ tipo }) {
           )}
 
           <form onSubmit={alEnviar} noValidate className="mt-6 space-y-5">
+            {/* Solo 2nd GUESTS: ¿correo institucional o aspirante? */}
+            {esEstudiante && (
+              <fieldset>
+                <legend className="text-sm font-semibold text-gray-900">¿Ya tienes tu correo @alumnos.udg.mx?</legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <OpcionCorreo
+                    nombre={nombreOpcionCorreo}
+                    checked={!esAspirante}
+                    onChange={() => cambiarModo(false)}
+                    titulo="Sí, ya lo tengo"
+                    descripcion="Soy estudiante de CUCEI."
+                  />
+                  <OpcionCorreo
+                    nombre={nombreOpcionCorreo}
+                    checked={esAspirante}
+                    disabled={!aspiranteDisponible}
+                    onChange={() => cambiarModo(true)}
+                    titulo="Aún no, soy aspirante"
+                    descripcion={textoOpcionAspirante(estadoVentana, periodo)}
+                  />
+                </div>
+              </fieldset>
+            )}
+
             <CampoFormulario
               ref={refNombre}
               etiqueta="Nombre completo"
@@ -364,18 +485,14 @@ function FormularioRegistro({ tipo }) {
 
             <CampoFormulario
               ref={refCorreo}
-              etiqueta={esEstudiante ? 'Correo institucional' : 'Correo'}
+              etiqueta={etiquetaCorreo}
               type="email"
               autoComplete="email"
-              placeholder={esEstudiante ? `nombre${DOMINIO_ESTUDIANTE}` : 'nombre@correo.com'}
+              placeholder={validarDominio ? `nombre${DOMINIO_ESTUDIANTE}` : 'nombre@correo.com'}
               Icono={LuMail}
               value={datos.correo}
               onChange={(e) => actualizar('correo', e.target.value)}
-              ayuda={
-                esEstudiante
-                  ? `Solo se aceptan correos que terminan en ${DOMINIO_ESTUDIANTE}.`
-                  : 'Puedes usar cualquier correo personal.'
-              }
+              ayuda={ayudaCorreo}
               error={errorCorreo}
               exito={exitoCorreo}
             />
@@ -383,7 +500,7 @@ function FormularioRegistro({ tipo }) {
             {esEstudiante ? (
               <CampoFormulario
                 ref={refCarrera}
-                etiqueta="Carrera"
+                etiqueta={esAspirante ? 'Carrera a la que fuiste admitido' : 'Carrera'}
                 placeholder="Ej. Ingeniería en Computación"
                 Icono={LuBookOpen}
                 value={datos.carrera}
@@ -403,6 +520,21 @@ function FormularioRegistro({ tipo }) {
                 onChange={(e) => actualizar('telefono', e.target.value)}
                 ayuda="10 dígitos. No se muestra a otros usuarios."
                 error={errores.telefono}
+              />
+            )}
+
+            {/* Solo aspirantes: ficha de admisión */}
+            {esEstudiante && esAspirante && (
+              <SubirDocumento
+                ref={refFicha}
+                etiqueta="Ficha de admisión"
+                ayuda="Foto o PDF de tu dictamen o ficha de admisión a CUCEI. Solo la verá el equipo de 2nd HOME y la borraremos al terminar la revisión."
+                valor={ficha}
+                onCambiar={(documento) => {
+                  setFicha(documento)
+                  if (errores.ficha) setErrores((prev) => ({ ...prev, ficha: undefined }))
+                }}
+                error={errores.ficha}
               />
             )}
 
@@ -451,9 +583,7 @@ function FormularioRegistro({ tipo }) {
                     He leído y acepto el aviso de privacidad
                   </label>
                   <p id={`${idAviso}-ayuda`} className="mt-1 text-gray-700">
-                    {esEstudiante
-                      ? 'Explica qué datos pedimos, para qué los usamos y qué ven los 2nd HOSTS de tu perfil.'
-                      : 'Explica qué datos pedimos y cómo cuidamos los documentos que te pediremos antes de publicar: tu identificación oficial y un comprobante de domicilio.'}
+                    {ayudaAviso}
                   </p>
                   <button type="button" onClick={() => setAvisoAbierto(true)} className={`mt-2 ${CLASE_ENLACE}`}>
                     Leer el aviso de privacidad

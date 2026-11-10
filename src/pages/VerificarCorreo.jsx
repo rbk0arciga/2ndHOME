@@ -54,7 +54,9 @@ export default function VerificarCorreo() {
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-home-orange-100 text-home-orange-700">
           <LuMailCheck className="h-8 w-8" aria-hidden="true" />
         </span>
-        <h1 className="mt-5 text-2xl font-bold text-gray-900">Verifica tu correo institucional</h1>
+        <h1 className="mt-5 text-2xl font-bold text-gray-900">
+          {usuario.aspirante ? 'Verifica tu correo' : 'Verifica tu correo institucional'}
+        </h1>
         <p className="mt-2 text-gray-700">
           Enviamos un enlace a <span className="font-semibold text-gray-900">{usuario.correo}</span>. Ábrelo y
           después regresa aquí. Si no lo ves, revisa la carpeta de correo no deseado.

@@ -24,9 +24,14 @@ export default function RutaProtegida() {
     return <Navigate to="/login" replace state={{ desde: location.pathname + location.search }} />
   }
 
-  // 2nd GUEST sin verificar su correo institucional: primero debe verificarlo
+  // 2nd GUEST (o aspirante) sin verificar su correo: primero debe verificarlo
   if (usuario.rol === 'estudiante' && !usuario.correoVerificado) {
     return <Navigate to="/verificar-correo" replace />
+  }
+
+  // Aspirante de primer ingreso: el equipo debe aprobar su ficha de admisión
+  if (usuario.rol === 'estudiante' && usuario.aspirante && usuario.fichaEstado !== 'aprobada') {
+    return <Navigate to="/verificacion-pendiente" replace />
   }
 
   return <Outlet />

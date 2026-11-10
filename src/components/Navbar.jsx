@@ -34,9 +34,13 @@ const PERFIL_POR_ROL = {
   admin: '/admin',
 }
 
-// En login, registro y verificación de correo el Navbar solo muestra el logo
+// En login, registro, verificación de correo y revisión de la ficha el Navbar solo muestra el logo
 const esPaginaDeAcceso = (pathname) =>
-  pathname === '/login' || pathname.startsWith('/registro') || pathname === '/verificar-correo'
+  pathname === '/login' ||
+  pathname.startsWith('/registro') ||
+  pathname === '/verificar-correo' ||
+  pathname === '/verificacion-pendiente'
+  
 // Enlace hacia el rol contrario: el 2nd GUEST puede volverse 2nd HOST y viceversa.
 // El administrador no tiene contraparte.
 function accionPorRol(usuario) {
