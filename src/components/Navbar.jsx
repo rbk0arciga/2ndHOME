@@ -17,6 +17,9 @@ import logo from '../assets/logo.png'
 import Avatar from './Avatar'
 import { conversaciones } from '../data/mockData'
 import { useSesion } from '../context/sesion'
+import AvisoVigenciaAspirante from './AvisoVigenciaAspirante'
+import { aspiranteVencido } from '../utils/aspirantes'
+
 // Contorno visible al navegar con teclado (se reutiliza en todo el archivo)
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -34,12 +37,13 @@ const PERFIL_POR_ROL = {
   admin: '/admin',
 }
 
-// En login, registro, verificación de correo y revisión de la ficha el Navbar solo muestra el logo
+// En las páginas de acceso y verificación el Navbar solo muestra el logo
 const esPaginaDeAcceso = (pathname) =>
   pathname === '/login' ||
   pathname.startsWith('/registro') ||
   pathname === '/verificar-correo' ||
-  pathname === '/verificacion-pendiente'
+  pathname === '/verificacion-pendiente' ||
+  pathname === '/actualizar-correo'
   
 // Enlace hacia el rol contrario: el 2nd GUEST puede volverse 2nd HOST y viceversa.
 // El administrador no tiene contraparte.
@@ -265,6 +269,10 @@ export default function Navbar() {
         </div>
       </header>
 
+      {/* Franja para aspirantes con cuenta vigente */}
+      {!enPaginaDeAcceso && usuario?.aspirante && !aspiranteVencido(usuario) && (
+        <AvisoVigenciaAspirante usuario={usuario} />
+      )}
       {!enPaginaDeAcceso && <NavegacionSecundaria pathname={pathname} rol={usuario?.rol} />}    </>
   )
 }

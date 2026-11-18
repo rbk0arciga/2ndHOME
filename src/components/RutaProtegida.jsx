@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { LuLoader } from 'react-icons/lu'
 import { useSesion } from '../context/sesion'
+import { aspiranteVencido } from '../utils/aspirantes'
 
 // Envuelve las rutas que requieren sesión.
 export default function RutaProtegida() {
@@ -22,6 +23,11 @@ export default function RutaProtegida() {
   // Sin sesión: al login, recordando la página que se intentaba abrir
   if (!usuario) {
     return <Navigate to="/login" replace state={{ desde: location.pathname + location.search }} />
+  }
+
+  // Aspirante cuya vigencia ya terminó: cuenta suspendida hasta usar su correo institucional
+  if (aspiranteVencido(usuario)) {
+    return <Navigate to="/actualizar-correo" replace />
   }
 
   // 2nd GUEST (o aspirante) sin verificar su correo: primero debe verificarlo

@@ -4,6 +4,7 @@ import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/f
 import { LuSearch, LuX, LuLoader } from 'react-icons/lu'
 import Avatar from '../Avatar'
 import EtiquetaAspirante from '../EtiquetaAspirante'
+import { aspiranteVencido } from '../../utils/aspirantes'
 import Pestanas from './Pestanas'
 import FormularioMotivo from './FormularioMotivo'
 import {
@@ -49,6 +50,11 @@ function FilaUsuario({ cuenta, numPropiedades, reportesAbiertos, onSuspender, on
                 </span>
               )}
              {cuenta.aspirante && <EtiquetaAspirante />}
+            {aspiranteVencido(cuenta) && (
+                <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-800">
+                  Suspendida hasta usar su correo institucional
+                </span>
+              )}
             </div>
             <p className="mt-0.5 text-sm text-gray-700 wrap-anywhere">{correo}</p>
             <p className="mt-1 text-sm text-gray-600">

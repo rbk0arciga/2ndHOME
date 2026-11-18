@@ -8,6 +8,7 @@ import { useSesion } from '../context/sesion'
 import { db } from '../firebase/config'
 import { guardarDocumento } from '../utils/documentos'
 import { formatoFechaLarga } from '../firebase/admision'
+import { aspiranteVencido } from '../utils/aspirantes'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -41,6 +42,8 @@ export default function VerificacionPendiente() {
 
   if (cargando) return null
   if (!usuario) return <Navigate to="/login" replace />
+  // Si su vigencia terminó mientras esperaba, su cuenta queda suspendida
+  if (aspiranteVencido(usuario)) return <Navigate to="/actualizar-correo" replace />
   // Solo aplica a aspirantes cuya ficha aún no está aprobada
   if (usuario.rol !== 'estudiante' || !usuario.aspirante || usuario.fichaEstado === 'aprobada') {
     return <Navigate to="/" replace />

@@ -7,12 +7,14 @@ import {
   updateProfile,
   sendEmailVerification,
   sendPasswordResetEmail,
+  verifyBeforeUpdateEmail,
 } from 'firebase/auth'
 import { doc, onSnapshot, setDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
 import { SesionContext } from './sesion'
 import { VERSION_AVISO } from '../utils/avisoPrivacidad'
 import { guardarDocumento } from '../utils/documentos'
+import { esCorreoInstitucional } from '../utils/aspirantes'
 
 // Mes actual como "2026-10" (mismo formato que usan los perfiles)
 function anioMesActual() {
@@ -20,12 +22,15 @@ function anioMesActual() {
   return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
 }
 
+// Errores de Firebase que indican que la sesión ya no es válida (por ejemplo, después de cambiar el correo)
+const ERRORES_SESION_VENCIDA = ['auth/user-token-expired', 'auth/user-not-found', 'auth/invalid-user-token']
+
 export default function SesionProvider({ children }) {
   const [usuarioAuth, setUsuarioAuth] = useState(null) // Cuenta de Firebase Authentication
   const [perfil, setPerfil] = useState(null) // Documento usuarios/{uid} de Firestore
   const [correoVerificado, setCorreoVerificado] = useState(false)
   const [cargando, setCargando] = useState(true)
-  const [avisoSesion, setAvisoSesion] = useState('') // Ej. aviso de cuenta suspendida
+  const [avisoSesion, setAvisoSesion] = useState('') // Mensaje que se muestra en el login
 
   // 1. Escucha cuando alguien inicia o cierra sesión (también al recargar la página)
   useEffect(() => {
@@ -41,9 +46,10 @@ export default function SesionProvider({ children }) {
   // 2. Con sesión, escucha en tiempo real su perfil en Firestore
   useEffect(() => {
     if (!usuarioAuth) return
+    const refPerfil = doc(db, 'usuarios', usuarioAuth.uid)
 
     return onSnapshot(
-      doc(db, 'usuarios', usuarioAuth.uid),
+      refPerfil,
       (instantanea) => {
         // Justo después de registrarse, el perfil tarda unos milisegundos en existir
         if (!instantanea.exists()) return
@@ -52,6 +58,22 @@ export default function SesionProvider({ children }) {
         if (datos.estado === 'suspendida') {
           setAvisoSesion('Tu cuenta está suspendida. Si crees que es un error, contacta al equipo de 2nd HOME.')
           signOut(auth)
+          return
+        }
+
+        // Aspirante que ya entró con su correo institucional verificado: deja de ser aspirante.
+        // Se sigue mostrando "Cargando…" hasta que llegue el perfil actualizado.
+        if (
+          datos.aspirante &&
+          usuarioAuth.emailVerified &&
+          esCorreoInstitucional(usuarioAuth.email) &&
+          datos.correo !== usuarioAuth.email
+        ) {
+          updateDoc(refPerfil, { correo: usuarioAuth.email, aspirante: false }).catch((error) => {
+            console.error('No se pudo actualizar el perfil del aspirante:', error.code)
+            setPerfil({ id: usuarioAuth.uid, ...datos })
+            setCargando(false)
+          })
           return
         }
 
@@ -134,7 +156,11 @@ export default function SesionProvider({ children }) {
     }
   }
 
-  const cerrarSesion = () => signOut(auth)
+  // aviso: mensaje opcional que se muestra en el login después de cerrar sesión
+  const cerrarSesion = (aviso = '') => {
+    setAvisoSesion(typeof aviso === 'string' ? aviso : '')
+    return signOut(auth)
+  }
 
   const reenviarVerificacion = () => sendEmailVerification(auth.currentUser)
 
@@ -148,6 +174,31 @@ export default function SesionProvider({ children }) {
 
   const recuperarContrasena = (correo) => sendPasswordResetEmail(auth, correo.trim())
 
+  // Aspirantes: envía el enlace para verificar y cambiar al correo institucional.
+  // El correo de la cuenta cambia hasta que se abre ese enlace.
+  const solicitarCambioCorreo = (nuevoCorreo) => verifyBeforeUpdateEmail(auth.currentUser, nuevoCorreo.trim())
+
+  // Revisa si el aspirante ya abrió el enlace. Devuelve 'reiniciar' (debe volver a iniciar sesión
+  // con su correo institucional) o 'pendiente' (todavía no abre el enlace).
+  const comprobarCambioCorreo = async () => {
+    try {
+      await auth.currentUser.reload()
+    } catch (error) {
+      // Firebase cierra la sesión al cambiar el correo
+      if (ERRORES_SESION_VENCIDA.includes(error.code)) {
+        await cerrarSesion('Tu correo cambió. Inicia sesión con tu correo institucional y tu misma contraseña.')
+        return 'reiniciar'
+      }
+      throw error
+    }
+
+    if (esCorreoInstitucional(auth.currentUser.email) && auth.currentUser.emailVerified) {
+      await cerrarSesion('Tu correo institucional quedó verificado. Inicia sesión con él y tu misma contraseña.')
+      return 'reiniciar'
+    }
+    return 'pendiente'
+  }
+
   return (
     <SesionContext.Provider
       value={{
@@ -160,6 +211,8 @@ export default function SesionProvider({ children }) {
         reenviarVerificacion,
         recargarVerificacion,
         recuperarContrasena,
+        solicitarCambioCorreo,
+        comprobarCambioCorreo,
       }}
     >
       {children}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { LuMailCheck, LuLoader } from 'react-icons/lu'
 import { useSesion } from '../context/sesion'
+import { aspiranteVencido } from '../utils/aspirantes'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -14,6 +15,8 @@ export default function VerificarCorreo() {
 
   if (cargando) return null
   if (!usuario) return <Navigate to="/login" replace />
+  // Aspirante vencido: primero debe cambiar a su correo institucional
+  if (aspiranteVencido(usuario)) return <Navigate to="/actualizar-correo" replace />
   // Si ya está verificado (o no es 2nd GUEST), no tiene nada que hacer aquí
   if (usuario.rol !== 'estudiante' || usuario.correoVerificado) return <Navigate to="/" replace />
 
