@@ -7,8 +7,9 @@ import PropertyCard from '../components/PropertyCard'
 import CampoFormulario from '../components/CampoFormulario'
 import FormularioPropiedad from '../components/FormularioPropiedad'
 import { useSesion } from '../context/sesion'
-import { usuarios, resenas, ESTADOS_REVISION, formatoPrecio } from '../data/mockData'
+import { usuarios, ESTADOS_REVISION, formatoPrecio } from '../data/mockData'
 import { usePropiedades } from '../context/propiedades'
+import { useResenasDePropiedades } from '../hooks/useResenas'
 import VerificacionAnfitrion from '../components/VerificacionAnfitrion'
 
 const ENFOQUE =
@@ -218,8 +219,8 @@ function Estrellas({ valor }) {
 
 function PanelResenas({ propiedadesPublicas }) {
   const ids = propiedadesPublicas.map((p) => p.id)
-  const lista = resenas.filter((r) => ids.includes(r.propiedadId)).slice(0, 3)
-
+  // Reseñas de prueba y reales de sus propiedades publicadas (las 5 más recientes)
+  const lista = useResenasDePropiedades(ids).slice(0, 5)
   // Promedio ponderado: cada propiedad pesa según su número de reseñas
   const conResenas = propiedadesPublicas.filter((p) => p.calificacion)
   const total = conResenas.reduce((suma, p) => suma + p.numResenas, 0)

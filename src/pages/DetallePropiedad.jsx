@@ -43,7 +43,6 @@ import {
 import { FaStar } from 'react-icons/fa'
 import Avatar from '../components/Avatar'
 import {
-  resenasDePropiedad,
   usuarios,
   TIPOS_PROPIEDAD,
   GENEROS,
@@ -59,6 +58,11 @@ import {
 } from '../data/mockData'
 import { useSesion } from '../context/sesion'
 import { usePropiedades } from '../context/propiedades'
+import FormularioResena from '../components/FormularioResena'
+import { useResenasDePropiedades } from '../hooks/useResenas'
+import { guardarResena } from '../firebase/resenas'
+
+
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
 
@@ -533,7 +537,18 @@ function Estrellas({ valor }) {
 
 function Resenas({ propiedad }) {
   const { id, calificacion, numResenas } = propiedad
-  const lista = resenasDePropiedad(id)
+  const { usuario } = useSesion()
+  const lista = useResenasDePropiedades([id])
+  const [escribiendo, setEscribiendo] = useState(false)
+
+  // Cualquier 2nd GUEST puede reseñar, una vez por propiedad
+  const yaReseno = lista.some((r) => r.autorId === usuario?.id)
+  const puedeResenar = usuario?.rol === 'estudiante' && !yaReseno
+
+  const publicar = async (datos) => {
+    await guardarResena({ propiedadId: id, usuario, ...datos })
+    setEscribiendo(false)
+  }
 
   return (
     // scroll-mt-24: al saltar a #resenas, el título no queda oculto bajo el Navbar fijo
@@ -551,10 +566,28 @@ function Resenas({ propiedad }) {
         )}
       </div>
 
+      {/* Escribir reseña (solo quien vivió aquí) */}
+      {puedeResenar &&
+        (escribiendo ? (
+          <div className="mt-4">
+            <FormularioResena onPublicar={publicar} onCancelar={() => setEscribiendo(false)} />
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border-2 border-dashed border-home-orange-200 bg-white p-5">
+            <p className="text-sm text-gray-700">¿Conoces este lugar? Tu reseña ayuda a otros 2nd GUESTS a decidir.</p>
+              <button
+              type="button"
+              onClick={() => setEscribiendo(true)}
+              className={`rounded-full bg-home-orange-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-home-orange-800 ${ENFOQUE}`}
+            >
+              Escribir mi reseña
+            </button>
+          </div>
+        ))}
+
       {lista.length === 0 ? (
         <p className="mt-4 rounded-3xl border border-home-orange-100 bg-white p-6 text-sm text-gray-700">
-          Este lugar todavía no tiene reseñas. Quienes vivan aquí podrán dejar la suya desde su perfil.
-        </p>
+        Este lugar todavía no tiene reseñas.        </p>
       ) : (
         <ul className="mt-4 space-y-4">
           {lista.map((resena) => (
@@ -579,7 +612,6 @@ function Resenas({ propiedad }) {
         </ul>
       )}
 
-      {/* En mockData no todas las reseñas tienen texto escrito */}
       {lista.length > 0 && lista.length < numResenas && (
         <p className="mt-3 text-xs text-gray-600">
           Mostrando {lista.length} de {numResenas} reseñas.

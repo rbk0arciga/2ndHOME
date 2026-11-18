@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { LuFootprints, LuHeart, LuHouse } from 'react-icons/lu'
 import { FaStar } from 'react-icons/fa'
 import Avatar from './Avatar'
+import { arrayRemove, arrayUnion, doc, updateDoc } from 'firebase/firestore'
+import { db } from '../firebase/config'
 import {
   TIPOS_PROPIEDAD,
   GENEROS,
@@ -49,18 +51,33 @@ function DistanciaCucei({ km }) {
 }
 
 /* ---------- Botón de favorito (solo para 2nd GUESTS) ---------- */
-// Maqueta: el estado vive solo en este componente. Con Firebase se guardará en el perfil.
-function BotonFavorito({ titulo, guardadoInicial }) {
-  const [guardado, setGuardado] = useState(guardadoInicial)
+// Se guarda en el perfil de Firestore; el corazón se actualiza solo porque el perfil se escucha en vivo
+function BotonFavorito({ titulo, propiedadId, usuario }) {
+  const guardado = usuario.favoritos?.includes(propiedadId) ?? false
+  const [ocupado, setOcupado] = useState(false)
+
+  const alternar = async () => {
+    setOcupado(true)
+    try {
+      await updateDoc(doc(db, 'usuarios', usuario.id), {
+        favoritos: guardado ? arrayRemove(propiedadId) : arrayUnion(propiedadId),
+      })
+    } catch (error) {
+      console.error('No se pudo guardar el favorito:', error.code)
+    } finally {
+      setOcupado(false)
+    }
+  }
 
   return (
     <button
       type="button"
-      onClick={() => setGuardado((valor) => !valor)}
+      onClick={alternar}
+      disabled={ocupado}
       aria-pressed={guardado}
       aria-label={`Guardar ${titulo} en favoritos`}
       // z-10: queda por encima del enlace que cubre toda la tarjeta
-      className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-home-orange-700 shadow-sm transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500"
+      className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-home-orange-700 shadow-sm transition-colors hover:bg-white disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500"
     >
       <LuHeart className={`h-5 w-5 ${guardado ? 'fill-current' : ''}`} aria-hidden="true" />
     </button>
@@ -126,9 +143,7 @@ export default function PropertyCard({ propiedad }) {
           </span>
         )}
 
-        {esEstudiante && (
-          <BotonFavorito titulo={titulo} guardadoInicial={usuario.favoritos?.includes(id) ?? false} />
-        )}
+        {esEstudiante && <BotonFavorito titulo={titulo} propiedadId={id} usuario={usuario} />}
         </div>
 
       {/* Información */}
