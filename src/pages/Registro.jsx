@@ -198,7 +198,7 @@ function RegistroExitoso({ rol, correo, aspirante }) {
 
   const esEstudiante = rol === 'estudiante'
 
-  let texto = 'Ya puedes publicar tu primera propiedad. Nuestro equipo la revisará antes de que aparezca en el catálogo.'
+  let texto = 'Antes de publicar tu primera propiedad, sube tu identificación oficial y un comprobante de domicilio desde tu perfil. Nuestro equipo los revisará junto con tu propiedad.'
   if (esEstudiante) {
     texto = aspirante ? (
       <>

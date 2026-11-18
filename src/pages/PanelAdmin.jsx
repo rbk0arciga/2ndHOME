@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { LuHouse, LuUsers, LuFlag, LuSettings, LuShieldCheck } from 'react-icons/lu'
 import RevisionPropiedades from '../components/admin/RevisionPropiedades'
 import RevisionFichas from '../components/admin/RevisionFichas'
+import RevisionDocumentosHost from '../components/admin/RevisionDocumentosHost'
 import GestionUsuarios from '../components/admin/GestionUsuarios'
 import GestionReportes from '../components/admin/GestionReportes'
 import ConfiguracionAdmision from '../components/admin/ConfiguracionAdmision'
@@ -38,6 +39,8 @@ function useConteo(esAdmin, crearConsulta) {
 
 const consultaReportesAbiertos = () => query(collection(db, 'reportes'), where('estado', '==', 'abierto'))
 const consultaFichasEnRevision = () => query(collection(db, 'usuarios'), where('fichaEstado', '==', 'en_revision'))
+const consultaDocumentosEnRevision = () =>
+  query(collection(db, 'usuarios'), where('documentosEstado', '==', 'en_revision'))
 
 export default function PanelAdmin() {
   const { usuario } = useSesion()
@@ -47,6 +50,7 @@ export default function PanelAdmin() {
 
   const reportesAbiertos = useConteo(esAdmin, consultaReportesAbiertos)
   const fichasEnRevision = useConteo(esAdmin, consultaFichasEnRevision)
+    const documentosEnRevision = useConteo(esAdmin, consultaDocumentosEnRevision)
 
   // Esta página es solo para el administrador
   if (!esAdmin) return <Navigate to="/" replace />
@@ -54,7 +58,7 @@ export default function PanelAdmin() {
 
   const pendientes = {
     propiedades: propiedades.filter((p) => p.estado === 'pending').length,
-    verificaciones: fichasEnRevision,
+    verificaciones: fichasEnRevision + documentosEnRevision,
     reportes: reportesAbiertos,
   }
 
@@ -96,7 +100,12 @@ export default function PanelAdmin() {
 
       <div className="mt-6">
         {seccion === 'propiedades' && <RevisionPropiedades />}
-        {seccion === 'verificaciones' && <RevisionFichas />}
+        {seccion === 'verificaciones' && (
+          <div className="space-y-12">
+            <RevisionFichas />
+            <RevisionDocumentosHost />
+          </div>
+        )}
         {seccion === 'usuarios' && <GestionUsuarios />}
         {seccion === 'reportes' && <GestionReportes />}
         {seccion === 'configuracion' && <ConfiguracionAdmision />}

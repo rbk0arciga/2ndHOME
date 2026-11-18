@@ -9,6 +9,7 @@ import FormularioPropiedad from '../components/FormularioPropiedad'
 import { useSesion } from '../context/sesion'
 import { usuarios, resenas, ESTADOS_REVISION, formatoPrecio } from '../data/mockData'
 import { usePropiedades } from '../context/propiedades'
+import VerificacionAnfitrion from '../components/VerificacionAnfitrion'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -505,14 +506,34 @@ function VistaPerfil({ idAnfitrion, esPropio, usuarioSesion }) {  // Propiedades
 
       {esPropio ? (
         <>
+          <VerificacionAnfitrion usuario={usuarioSesion} />
           <SeccionGestion
             propiedadesAnfitrion={propiedadesAnfitrion}
             onCambiarDisponibilidad={cambiarDisponibilidad}
           />
-          <FormularioPropiedad
-            arrendador={{ id: anfitrion.id, nombre: anfitrion.nombre, avatar: anfitrion.avatar }}
-            onPublicar={agregarPropiedad}
-          />
+          {/* Solo puede publicar si ya envió sus documentos */}
+          {['en_revision', 'aprobados'].includes(usuarioSesion?.documentosEstado) ? (
+            <FormularioPropiedad
+              arrendador={{ id: anfitrion.id, nombre: anfitrion.nombre, avatar: anfitrion.avatar }}
+              onPublicar={agregarPropiedad}
+            />
+          ) : (
+            <section
+              id="publicar"
+              aria-labelledby="titulo-publicar"
+              className="mt-12 scroll-mt-24 rounded-3xl border-2 border-dashed border-home-orange-200 bg-white p-6 text-center md:p-8"
+            >
+              <h2 id="titulo-publicar" className="text-xl font-bold text-gray-900">
+                Publicar nueva propiedad
+              </h2>
+              <p className="mx-auto mt-2 max-w-prose text-sm text-gray-700">
+                Para publicar, primero sube tu identificación oficial y tu comprobante de domicilio.
+              </p>
+              <a href="#verificacion" className={`${CLASE_BOTON_SECUNDARIO} mt-4`}>
+                Ir a la verificación
+              </a>
+            </section>
+          )}
         </>
       ) : (
         <SeccionEspacios nombre={anfitrion.nombre} propiedadesPublicas={espaciosVisibles} />

@@ -1,60 +1,80 @@
-import { useRef } from 'react'
-import { ENFOQUE } from './estilos'
+import { useId, useState } from 'react'
+import { CLASE_BOTON_PRINCIPAL, CLASE_BOTON_SECUNDARIO, CLASE_BOTON_PELIGRO_RELLENO } from './estilos'
 
-// Pestañas accesibles: Tab entra a la pestaña activa; las flechas izquierda/derecha cambian de pestaña.
-// opciones: [{ valor, etiqueta, conteo? }]. El panel asociado debe tener id={idPanel}
-// y aria-labelledby={`${idPanel}-${valor activo || 'todos'}`}.
-export default function Pestanas({ etiqueta, opciones, activa, onCambiar, idPanel }) {
-  const botonesRef = useRef([])
+// Formulario corto para escribir un motivo antes de confirmar una acción.
+// children: contenido extra opcional antes de los botones (por ejemplo, una casilla).
+export default function FormularioMotivo({
+  etiqueta,
+  ayuda,
+  placeholder,
+  textoConfirmar,
+  tono = 'peligro', // 'peligro' (rojo) o 'neutral' (naranja)
+  minimo = 10,
+  mensajeError,
+  onConfirmar,
+  onCancelar,
+  children,
+}) {
+  const [texto, setTexto] = useState('')
+  const [error, setError] = useState('')
+  const id = useId()
+  const esPeligro = tono === 'peligro'
 
-  const alPresionarTecla = (e, indice) => {
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+  const alConfirmar = (e) => {
     e.preventDefault()
-    const paso = e.key === 'ArrowRight' ? 1 : -1
-    const siguiente = (indice + paso + opciones.length) % opciones.length
-    onCambiar(opciones[siguiente].valor)
-    botonesRef.current[siguiente]?.focus()
+    if (texto.trim().length < minimo) {
+      setError(mensajeError ?? `Escribe al menos ${minimo} caracteres.`)
+      return
+    }
+    onConfirmar(texto.trim())
   }
 
+  let claseBorde = esPeligro ? 'border-red-200 focus:border-red-500' : 'border-home-orange-200 focus:border-home-orange-500'
+  if (error) claseBorde = 'border-red-600 focus:border-red-700'
+
   return (
-    <div
-      role="tablist"
-      aria-label={etiqueta}
-      className="flex gap-1 overflow-x-auto rounded-full border border-home-orange-200 bg-white p-1 sm:inline-flex"
+    <form
+      onSubmit={alConfirmar}
+      noValidate
+      className={`space-y-3 rounded-2xl p-4 ${esPeligro ? 'bg-red-50' : 'bg-home-orange-50'}`}
     >
-      {opciones.map(({ valor, etiqueta: texto, conteo }, indice) => {
-        const seleccionada = activa === valor
-        return (
-          <button
-            key={valor || 'todos'}
-            ref={(elemento) => {
-              botonesRef.current[indice] = elemento
-            }}
-            type="button"
-            role="tab"
-            id={`${idPanel}-${valor || 'todos'}`}
-            aria-selected={seleccionada}
-            aria-controls={idPanel}
-            tabIndex={seleccionada ? 0 : -1}
-            onClick={() => onCambiar(valor)}
-            onKeyDown={(e) => alPresionarTecla(e, indice)}
-            className={`flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold transition-colors sm:flex-none sm:px-4 ${ENFOQUE} ${
-              seleccionada ? 'bg-home-orange-700 text-white' : 'text-home-orange-900 hover:bg-home-orange-100'
-            }`}
-          >
-            {texto}
-            {conteo !== undefined && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  seleccionada ? 'bg-white/20 text-white' : 'bg-home-orange-100 text-home-orange-900'
-                }`}
-              >
-                {conteo}
-              </span>
-            )}
-          </button>
-        )
-      })}
-    </div>
+      <div>
+        <label htmlFor={id} className="block text-sm font-semibold text-gray-900">
+          {etiqueta}
+        </label>
+        {ayuda && <p className="mt-0.5 text-xs text-gray-700">{ayuda}</p>}
+      </div>
+
+      <textarea
+        id={id}
+        rows={3}
+        autoFocus
+        value={texto}
+        onChange={(e) => {
+          setTexto(e.target.value)
+          if (error) setError('')
+        }}
+        placeholder={placeholder}
+        aria-invalid={error ? 'true' : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={`w-full resize-y rounded-xl border-2 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none ${claseBorde}`}
+      />
+      {error && (
+        <p id={`${id}-error`} className="text-sm font-medium text-red-700">
+          {error}
+        </p>
+      )}
+
+      {children}
+
+      <div className="flex flex-wrap gap-3">
+        <button type="submit" className={esPeligro ? CLASE_BOTON_PELIGRO_RELLENO : CLASE_BOTON_PRINCIPAL}>
+          {textoConfirmar}
+        </button>
+        <button type="button" onClick={onCancelar} className={CLASE_BOTON_SECUNDARIO}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }
