@@ -6,6 +6,7 @@ import { FaStar } from 'react-icons/fa'
 import Avatar from '../components/Avatar'
 import PropertyCard from '../components/PropertyCard'
 import CampoFormulario from '../components/CampoFormulario'
+import SubirAvatar from '../components/SubirAvatar'
 import { useSesion } from '../context/sesion'
 import { usePropiedades } from '../context/propiedades'
 import { useResenasDeAutor } from '../hooks/useResenas'
@@ -135,7 +136,9 @@ function FormularioPerfil({ usuario, onTerminar }) {
       <h1 id="titulo-editar" className="text-xl font-bold text-gray-900">
         Editar perfil
       </h1>
-
+      <div className="mt-5">
+        <SubirAvatar usuario={usuario} />
+      </div>
       <form onSubmit={alGuardar} noValidate className="mt-5 space-y-4">
         <CampoFormulario
           etiqueta="Carrera"

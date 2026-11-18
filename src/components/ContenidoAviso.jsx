@@ -1,15 +1,16 @@
 import { VERSION_AVISO, CORREO_PRIVACIDAD } from '../utils/avisoPrivacidad'
-
-export default function ContenidoAviso({ nivel = 2 }) {
+function Seccion({ nivel, titulo, children }) {
   const Titulo = `h${nivel}`
-
-  const Seccion = ({ titulo, children }) => (
+  return (
     <section className="border-t border-home-orange-100 pt-6">
       <Titulo className="text-lg font-bold text-gray-900">{titulo}</Titulo>
       <div className="mt-3 space-y-3 leading-relaxed text-gray-800">{children}</div>
     </section>
   )
+}
 
+// Texto del aviso de privacidad. Lo usan la página /aviso-de-privacidad y la ventana del registro.
+export default function ContenidoAviso({ nivel = 2 }) {
   return (
     <div className="space-y-6">
       <div>
@@ -22,14 +23,14 @@ export default function ContenidoAviso({ nivel = 2 }) {
         </p>
       </div>
 
-      <Seccion titulo="Quién es responsable de tus datos">
+      <Seccion nivel={nivel} titulo="Quién es responsable de tus datos">
         <p>
           El equipo de desarrollo de 2nd HOME es responsable del tratamiento de tus datos personales. Para cualquier
           duda o solicitud, escríbenos a <span className="font-semibold">{CORREO_PRIVACIDAD}</span>.
         </p>
       </Seccion>
 
-      <Seccion titulo="Qué datos pedimos">
+      <Seccion nivel={nivel} titulo="Qué datos pedimos">
         <ul className="list-disc space-y-2 pl-5">
           <li>
             <strong>Para crear tu cuenta:</strong> nombre, correo electrónico y contraseña. Si eres 2nd GUEST, tu
@@ -44,6 +45,9 @@ export default function ContenidoAviso({ nivel = 2 }) {
             que rentas, para comprobar que el lugar existe y que eres responsable de él.
           </li>
           <li>
+            <strong>Foto de perfil:</strong> es opcional. Si la subes, la reducimos y la guardamos junto a tu perfil.
+          </li>
+          <li>
             <strong>Lo que publicas:</strong> propiedades, mensajes, reseñas, publicaciones y comentarios en
             Comunidad, y los reportes que envías.
           </li>
@@ -54,7 +58,7 @@ export default function ContenidoAviso({ nivel = 2 }) {
         </p>
       </Seccion>
 
-      <Seccion titulo="Para qué usamos tus datos">
+      <Seccion nivel={nivel} titulo="Para qué usamos tus datos">
         <ul className="list-disc space-y-2 pl-5">
           <li>Crear y administrar tu cuenta.</li>
           <li>Verificar que eres estudiante o aspirante de CUCEI, o que eres responsable del inmueble que publicas.</li>
@@ -64,7 +68,7 @@ export default function ContenidoAviso({ nivel = 2 }) {
         <p>No usamos tus datos para publicidad ni los vendemos.</p>
       </Seccion>
 
-      <Seccion titulo="Cómo tratamos tus documentos">
+      <Seccion nivel={nivel} titulo="Cómo tratamos tus documentos">
         <ul className="list-disc space-y-2 pl-5">
           <li>Solo el equipo de administración de 2nd HOME puede ver los documentos que subes.</li>
           <li>
@@ -75,10 +79,10 @@ export default function ContenidoAviso({ nivel = 2 }) {
         </ul>
       </Seccion>
 
-      <Seccion titulo="Qué ven los demás usuarios">
+      <Seccion nivel={nivel} titulo="Qué ven los demás usuarios">
         <ul className="list-disc space-y-2 pl-5">
           <li>
-            <strong>Los 2nd HOSTS</strong> ven tu nombre y tu carrera. Si eres aspirante de primer ingreso, también ven
+            <strong>Los 2nd HOSTS</strong> ven tu nombre, tu carrera y tu foto de perfil si la subiste. Si eres aspirante de primer ingreso, también ven
             esa leyenda, para que sepan que todavía no tienes correo institucional y decidan si te aceptan.
           </li>
           <li>
@@ -89,14 +93,14 @@ export default function ContenidoAviso({ nivel = 2 }) {
         </ul>
       </Seccion>
 
-      <Seccion titulo="Con quién compartimos tus datos">
+      <Seccion nivel={nivel} titulo="Con quién compartimos tus datos">
         <p>
           No compartimos tus datos con terceros, salvo que una autoridad competente lo requiera conforme a la ley. La
           información se guarda en los servicios de Google Firebase, que usamos para operar la plataforma.
         </p>
       </Seccion>
 
-      <Seccion titulo="Tus derechos">
+      <Seccion nivel={nivel} titulo="Tus derechos">
         <p>
           Puedes pedir acceso a tus datos, corregirlos, cancelarlos u oponerte a su uso (derechos ARCO), así como
           revocar tu consentimiento. Para hacerlo, escríbenos a{' '}
@@ -105,7 +109,7 @@ export default function ContenidoAviso({ nivel = 2 }) {
         </p>
       </Seccion>
 
-      <Seccion titulo="Cambios a este aviso">
+      <Seccion nivel={nivel} titulo="Cambios a este aviso">
         <p>
           Si cambiamos este aviso, publicaremos la nueva versión en esta página y te pediremos aceptarla de nuevo
           cuando el cambio afecte el uso de tus datos.

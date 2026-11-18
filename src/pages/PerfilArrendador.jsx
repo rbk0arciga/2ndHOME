@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { LuHouse, LuPlus, LuPencil } from 'react-icons/lu'
+import { LuHouse, LuPlus, LuPencil, LuLoader } from 'react-icons/lu'
 import { FaStar } from 'react-icons/fa'
 import Avatar from '../components/Avatar'
 import PropertyCard from '../components/PropertyCard'
@@ -11,6 +11,9 @@ import { usuarios, ESTADOS_REVISION, formatoPrecio } from '../data/mockData'
 import { usePropiedades } from '../context/propiedades'
 import { useResenasDePropiedades } from '../hooks/useResenas'
 import VerificacionAnfitrion from '../components/VerificacionAnfitrion'
+import SubirAvatar from '../components/SubirAvatar'
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '../firebase/config'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -111,11 +114,13 @@ function EncabezadoAnfitrion({ anfitrion, perfil, esPropio, onEditar }) {
 }
 
 /* ==========================================================
-   Formulario para editar el perfil del 2nd HOST
+   Formulario para editar el perfil del 2nd HOST (se guarda en Firestore)
    ========================================================== */
-function FormularioPerfilAnfitrion({ perfil, onGuardar, onCancelar }) {
+function FormularioPerfilAnfitrion({ usuario, perfil, onTerminar }) {
   const [datos, setDatos] = useState(perfil)
   const [errores, setErrores] = useState({})
+  const [errorGeneral, setErrorGeneral] = useState('')
+  const [guardando, setGuardando] = useState(false)
   const idBio = useId()
 
   const actualizar = (campo, valor) => {
@@ -123,25 +128,30 @@ function FormularioPerfilAnfitrion({ perfil, onGuardar, onCancelar }) {
     if (errores[campo]) setErrores((prev) => ({ ...prev, [campo]: undefined }))
   }
 
-  const alGuardar = (e) => {
+  const alGuardar = async (e) => {
     e.preventDefault()
     const nuevosErrores = {}
-    if (datos.edad !== '') {
-      const edad = Number(datos.edad)
-      if (!Number.isInteger(edad) || edad < 18 || edad > 99) {
-        nuevosErrores.edad = 'Escribe una edad entre 18 y 99, o déjala vacía.'
-      }
+    const edad = Number(datos.edad)
+    if (datos.edad !== '' && (!Number.isInteger(edad) || edad < 18 || edad > 99)) {
+      nuevosErrores.edad = 'Escribe una edad entre 18 y 99, o déjala vacía.'
     }
     setErrores(nuevosErrores)
     if (Object.keys(nuevosErrores).length > 0) return
 
-    // MAQUETA: con Firebase aquí se actualizará el documento del usuario en Firestore
-    onGuardar({
-      profesion: datos.profesion.trim(),
-      edad: datos.edad === '' ? '' : Number(datos.edad),
-      pasatiempo: datos.pasatiempo.trim(),
-      bio: datos.bio.trim(),
-    })
+    setGuardando(true)
+    setErrorGeneral('')
+    try {
+      await updateDoc(doc(db, 'usuarios', usuario.id), {
+        profesion: datos.profesion.trim(),
+        edad: datos.edad === '' ? null : edad,
+        pasatiempo: datos.pasatiempo.trim(),
+        bio: datos.bio.trim(),
+      })
+      onTerminar()
+    } catch {
+      setErrorGeneral('No pudimos guardar los cambios. Inténtalo de nuevo.')
+      setGuardando(false)
+    }
   }
 
   return (
@@ -151,7 +161,11 @@ function FormularioPerfilAnfitrion({ perfil, onGuardar, onCancelar }) {
       </h1>
       <p className="mt-1 text-sm text-gray-700">Esta información la ven los 2nd GUESTS en tu perfil.</p>
 
-      <form onSubmit={alGuardar} noValidate className="mt-5 space-y-4">
+      <div className="mt-5">
+        <SubirAvatar usuario={usuario} />
+      </div>
+
+      <form onSubmit={alGuardar} noValidate className="mt-6 space-y-4 border-t border-home-orange-100 pt-6">
         <div className="grid gap-4 sm:grid-cols-3">
           <CampoFormulario
             etiqueta="Profesión"
@@ -191,12 +205,19 @@ function FormularioPerfilAnfitrion({ perfil, onGuardar, onCancelar }) {
           />
         </div>
 
+        {errorGeneral && (
+          <p role="alert" className="text-sm font-medium text-red-700">
+            {errorGeneral}
+          </p>
+        )}
+
         <div className="flex flex-wrap gap-3 pt-2">
-          <button type="submit" className={CLASE_BOTON_PRINCIPAL}>
+          <button type="submit" disabled={guardando} className={`${CLASE_BOTON_PRINCIPAL} disabled:opacity-80`}>
+            {guardando && <LuLoader className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
             Guardar cambios
           </button>
-          <button type="button" onClick={onCancelar} className={CLASE_BOTON_SECUNDARIO}>
-            Cancelar
+          <button type="button" onClick={onTerminar} className={CLASE_BOTON_SECUNDARIO}>
+            Cerrar
           </button>
         </div>
       </form>
@@ -461,13 +482,12 @@ function VistaPerfil({ idAnfitrion, esPropio, usuarioSesion }) {  // Propiedades
   const { propiedades, cambiarDisponibilidad, agregarPropiedad } = usePropiedades()
   // En el perfil propio, los datos vienen de la sesión (Firestore); en los demás, de las propiedades
   const anfitrion = esPropio ? usuarioSesion : obtenerAnfitrion(idAnfitrion, propiedades)
-  // MAQUETA: el perfil editado vive solo en esta página. Con Firebase se guardará en Firestore.
-  const [perfil, setPerfil] = useState(() => ({
+  const perfil = {
     profesion: anfitrion?.profesion ?? '',
     edad: anfitrion?.edad ?? '',
     pasatiempo: anfitrion?.pasatiempo ?? '',
     bio: anfitrion?.bio ?? '',
-  }))
+  }
   const [editando, setEditando] = useState(false)
 
   if (!anfitrion) return <AnfitrionNoEncontrado />
@@ -484,12 +504,9 @@ function VistaPerfil({ idAnfitrion, esPropio, usuarioSesion }) {  // Propiedades
         <div className="lg:col-span-7">
           {editando ? (
             <FormularioPerfilAnfitrion
+              usuario={usuarioSesion}
               perfil={perfil}
-              onGuardar={(nuevoPerfil) => {
-                setPerfil(nuevoPerfil)
-                setEditando(false)
-              }}
-              onCancelar={() => setEditando(false)}
+              onTerminar={() => setEditando(false)}
             />
           ) : (
             <EncabezadoAnfitrion

@@ -45,13 +45,9 @@ export default function PropiedadesProvider({ children }) {
     )
   }, [idUsuario])
 
-  // Sin sesión no se usan reseñas (evita mostrar las de una sesión anterior)
-  const resenasVigentes = idUsuario ? resenasReales : []
-
-  // Propiedades con la calificación y el número de reseñas actualizados
   const propiedadesConResenas = useMemo(
-    () => aplicarResenas(propiedades, resenasVigentes),
-    [propiedades, resenasVigentes]
+    () => aplicarResenas(propiedades, idUsuario ? resenasReales : []),
+    [propiedades, resenasReales, idUsuario]
   )
 
   // El 2nd HOST activa o pausa un espacio
