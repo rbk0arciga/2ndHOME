@@ -1,13 +1,16 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { LuArrowLeft, LuSend, LuMessageCircle, LuInfo, LuFlag } from 'react-icons/lu'
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { LuArrowLeft, LuSend, LuMessageCircle, LuInfo, LuFlag, LuLoader } from 'react-icons/lu'
 import Avatar from '../components/Avatar'
 import ChatBubble from '../components/ChatBubble'
 import EtiquetaAspirante from '../components/EtiquetaAspirante'
 import { useSesion } from '../context/sesion'
-import { conversaciones as conversacionesMock, usuarios, obtenerPropiedad, MOTIVOS_REPORTE } from '../data/mockData'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { usePropiedades } from '../context/propiedades'
 import { db } from '../firebase/config'
+import { escucharConversaciones, escucharMensajes, enviarMensaje, marcarLeida, idConversacion } from '../firebase/chat'
+import { MOTIVOS_REPORTE } from '../data/mockData'
+
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
 
@@ -19,34 +22,29 @@ const SUGERENCIAS = [
 ]
 
 /* ==========================================================
-   Utilidades de fecha
+   Utilidades de fecha (las fechas llegan como texto ISO)
    ========================================================== */
-const formatoHora = (fecha) =>
-  new Date(fecha).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' })
+const formatoHora = (iso) => new Date(iso).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' })
 
 const mismoDia = (a, b) => a.toDateString() === b.toDateString()
 
 // "Hoy", "Ayer" o "28 de septiembre"
-function etiquetaDia(fecha) {
-  const dia = new Date(fecha)
+function etiquetaDia(iso) {
+  const dia = new Date(iso)
   const hoy = new Date()
   const ayer = new Date()
   ayer.setDate(hoy.getDate() - 1)
-
   if (mismoDia(dia, hoy)) return 'Hoy'
   if (mismoDia(dia, ayer)) return 'Ayer'
   return dia.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
 }
 
-// En la lista: la hora si el mensaje es de hoy; si no, la fecha corta ("28 sept")
-function fechaCorta(fecha) {
-  const dia = new Date(fecha)
-  return mismoDia(dia, new Date())
-    ? formatoHora(fecha)
-    : dia.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
+// En la lista: la hora si es de hoy; si no, la fecha corta
+function fechaCorta(iso) {
+  const dia = new Date(iso)
+  return mismoDia(dia, new Date()) ? formatoHora(iso) : dia.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
 }
 
-// Agrupa los mensajes por día para mostrar separadores ("Hoy", "Ayer"...)
 function agruparPorDia(mensajes) {
   const grupos = []
   mensajes.forEach((mensaje) => {
@@ -58,46 +56,9 @@ function agruparPorDia(mensajes) {
   return grupos
 }
 
-/* ==========================================================
-   Utilidades de conversaciones
-   ========================================================== */
-// La otra persona de la conversación, según quién está viendo el chat
-function contactoDe(conversacion, usuario) {
-  if (usuario.rol === 'arrendador') {
-    const estudiante = usuarios.find((u) => u.id === conversacion.estudianteId)
-      return {
-        id: conversacion.estudianteId,
-        nombre: estudiante?.nombre ?? '2nd GUEST',
-        avatar: estudiante?.avatar,
-        aspirante: estudiante?.aspirante ?? false,
-      }
-  }
-  return conversacion.arrendador
-}
-
-// Conversaciones del usuario. Si llega desde una propiedad (?propiedad=p1) y aún
-// no existe conversación sobre ella, se crea una vacía al principio de la lista.
-function cargarConversaciones(usuario, propiedadId) {
-  const propias = conversacionesMock
-    .filter((c) => (usuario.rol === 'arrendador' ? c.arrendador.id === usuario.id : c.estudianteId === usuario.id))
-    .map((c) => ({ ...c, mensajes: [...c.mensajes] })) // Copia: los cambios no alteran mockData
-
-  if (usuario.rol !== 'estudiante' || !propiedadId) return propias
-  if (propias.some((c) => c.propiedadId === propiedadId)) return propias
-
-  const propiedad = obtenerPropiedad(propiedadId)
-  if (!propiedad || propiedad.estado !== 'approved') return propias
-
-  const nueva = {
-    id: `nueva-${propiedadId}`,
-    estudianteId: usuario.id,
-    arrendador: propiedad.arrendador,
-    propiedadId,
-    noLeidos: 0,
-    mensajes: [],
-  }
-  return [nueva, ...propias]
-}
+// La otra persona de la conversación
+const contactoDe = (conversacion, usuario) =>
+  usuario.rol === 'arrendador' ? conversacion.estudiante : conversacion.arrendador
 
 /* ==========================================================
    Lista de conversaciones
@@ -107,10 +68,9 @@ function ListaConversaciones({ conversaciones, usuario, seleccionadaId, onSelecc
     <ul className="divide-y divide-home-orange-100">
       {conversaciones.map((conversacion) => {
         const contacto = contactoDe(conversacion, usuario)
-        const propiedad = obtenerPropiedad(conversacion.propiedadId)
-        const ultimo = conversacion.mensajes.at(-1)
+        const ultimo = conversacion.ultimoMensaje
         const activa = conversacion.id === seleccionadaId
-        const tieneNoLeidos = conversacion.noLeidos > 0
+        const noLeidos = conversacion.noLeidos?.[usuario.id] ?? 0
 
         return (
           <li key={conversacion.id}>
@@ -126,25 +86,24 @@ function ListaConversaciones({ conversaciones, usuario, seleccionadaId, onSelecc
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className="truncate font-semibold text-gray-900">{contacto.nombre}</span>
-                  {ultimo && <span className="shrink-0 text-xs text-gray-600">{fechaCorta(ultimo.fecha)}</span>}
-                </span>
-                <span className="block truncate text-xs text-home-orange-800">{propiedad?.titulo}</span>
-                  {contacto.aspirante && (
-                    <span className="mt-1 block">
-                      <EtiquetaAspirante />
-                    </span>
+                  {ultimo && conversacion.actualizadoEn && (
+                    <span className="shrink-0 text-xs text-gray-600">{fechaCorta(conversacion.actualizadoEn)}</span>
                   )}
-                
-                <span className="mt-0.5 flex items-center gap-2">
-                  <span className={`truncate text-sm ${tieneNoLeidos ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
-                    {ultimo
-                      ? `${ultimo.autorId === usuario.id ? 'Tú: ' : ''}${ultimo.texto}`
-                      : 'Nueva conversación'}
+                </span>
+                <span className="block truncate text-xs text-home-orange-800">{conversacion.propiedadTitulo}</span>
+                {contacto.aspirante && (
+                  <span className="mt-1 block">
+                    <EtiquetaAspirante />
                   </span>
-                  {tieneNoLeidos && (
+                )}
+                <span className="mt-0.5 flex items-center gap-2">
+                  <span className={`truncate text-sm ${noLeidos > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                    {ultimo ? `${ultimo.autorId === usuario.id ? 'Tú: ' : ''}${ultimo.texto}` : 'Nueva conversación'}
+                  </span>
+                  {noLeidos > 0 && (
                     <span className="ml-auto grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-home-orange-700 px-1.5 text-xs font-semibold text-white">
                       <span className="sr-only">Mensajes sin leer: </span>
-                      {conversacion.noLeidos}
+                      {noLeidos}
                     </span>
                   )}
                 </span>
@@ -252,17 +211,71 @@ function BarraReporte({ estado, error, onConfirmar, onCancelar }) {
 /* ==========================================================
    Ventana de una conversación
    ========================================================== */
-function VentanaConversacion({ conversacion, usuario, onEnviar, onVolver }) {
+function VentanaConversacion({ conversacion, usuario, onVolver }) {
+  const [mensajes, setMensajes] = useState([])
   const [texto, setTexto] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [errorEnvio, setErrorEnvio] = useState('')
   const [estadoReporte, setEstadoReporte] = useState('ninguno') // 'ninguno' | 'confirmando' | 'enviado'
   const [errorReporte, setErrorReporte] = useState('')
   const zonaMensajesRef = useRef(null)
   const campoRef = useRef(null)
 
   const contacto = contactoDe(conversacion, usuario)
-  const propiedad = obtenerPropiedad(conversacion.propiedadId)
-  const grupos = agruparPorDia(conversacion.mensajes)
-    const enviarReporte = async ({ motivo, descripcion }) => {
+  const esNueva = Boolean(conversacion.nueva)
+  const misNoLeidos = conversacion.noLeidos?.[usuario.id] ?? 0
+
+  // Mensajes en tiempo real (una conversación nueva todavía no tiene)
+  useEffect(() => {
+    if (esNueva) return
+    return escucharMensajes(conversacion.id, setMensajes)
+  }, [conversacion.id, esNueva])
+
+  // Al abrirla o al llegar mensajes nuevos con la conversación abierta, se marcan como leídos
+  useEffect(() => {
+    if (esNueva || misNoLeidos === 0) return
+    marcarLeida(conversacion.id, usuario.id).catch((error) => console.error('No se pudo marcar como leída:', error.code))
+  }, [conversacion.id, esNueva, misNoLeidos, usuario.id])
+
+  // Baja hasta el último mensaje
+  useEffect(() => {
+    const zona = zonaMensajesRef.current
+    if (zona) zona.scrollTop = zona.scrollHeight
+  }, [mensajes.length])
+
+  const grupos = agruparPorDia(mensajes)
+
+  const enviar = async () => {
+    const limpio = texto.trim()
+    if (!limpio || enviando) return
+    setEnviando(true)
+    setErrorEnvio('')
+    try {
+      await enviarMensaje({ conversacion, autorId: usuario.id, texto: limpio, esNueva })
+      setTexto('')
+      campoRef.current?.focus()
+    } catch (error) {
+      console.error('No se pudo enviar el mensaje:', error.code)
+      setErrorEnvio('No pudimos enviar el mensaje. Inténtalo de nuevo.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  // Enter envía; Shift + Enter hace un salto de línea
+  const alPresionarTecla = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      enviar()
+    }
+  }
+
+  const usarSugerencia = (sugerencia) => {
+    setTexto(sugerencia)
+    campoRef.current?.focus()
+  }
+
+  const enviarReporte = async ({ motivo, descripcion }) => {
     setErrorReporte('')
     try {
       await addDoc(collection(db, 'reportes'), {
@@ -280,33 +293,6 @@ function VentanaConversacion({ conversacion, usuario, onEnviar, onVolver }) {
     } catch {
       setErrorReporte('No pudimos enviar el reporte. Revisa tu conexión e inténtalo de nuevo.')
     }
-  }
-  // Baja hasta el último mensaje al abrir la conversación y cada vez que llega uno nuevo
-  useEffect(() => {
-    const zona = zonaMensajesRef.current
-    if (zona) zona.scrollTop = zona.scrollHeight
-  }, [conversacion.mensajes.length])
-
-  const enviar = () => {
-    const limpio = texto.trim()
-    if (!limpio) return
-    onEnviar(conversacion.id, limpio)
-    setTexto('')
-    campoRef.current?.focus()
-  }
-
-  // Enter envía; Shift + Enter hace un salto de línea
-  const alPresionarTecla = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      enviar()
-    }
-  }
-
-  // Las sugerencias llenan el campo para que el usuario pueda editarlas antes de enviar
-  const usarSugerencia = (sugerencia) => {
-    setTexto(sugerencia)
-    campoRef.current?.focus()
   }
 
   return (
@@ -326,28 +312,28 @@ function VentanaConversacion({ conversacion, usuario, onEnviar, onVolver }) {
 
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-semibold text-gray-900">{contacto.nombre}</h2>
-          {propiedad && (
-            <Link
-              to={`/propiedad/${propiedad.id}`}
-              className={`block truncate rounded text-xs font-medium text-home-orange-800 underline underline-offset-2 hover:text-home-orange-900 ${ENFOQUE}`}
-            >
-              {propiedad.titulo}
-            </Link>
-          )}
+          <Link
+            to={`/propiedad/${conversacion.propiedadId}`}
+            className={`block truncate rounded text-xs font-medium text-home-orange-800 underline underline-offset-2 hover:text-home-orange-900 ${ENFOQUE}`}
+          >
+            {conversacion.propiedadTitulo}
+          </Link>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setEstadoReporte('confirmando')}
-          disabled={estadoReporte !== 'ninguno'}
-          className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-home-orange-50 disabled:cursor-default disabled:opacity-60 ${ENFOQUE}`}
-        >
-          <LuFlag className="h-4 w-4" aria-hidden="true" />
-          <span className="sr-only sm:not-sr-only">{estadoReporte === 'enviado' ? 'Reportada' : 'Reportar'}</span>
-        </button>
+        {!esNueva && (
+          <button
+            type="button"
+            onClick={() => setEstadoReporte('confirmando')}
+            disabled={estadoReporte !== 'ninguno'}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-home-orange-50 disabled:cursor-default disabled:opacity-60 ${ENFOQUE}`}
+          >
+            <LuFlag className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only sm:not-sr-only">{estadoReporte === 'enviado' ? 'Reportada' : 'Reportar'}</span>
+          </button>
+        )}
       </header>
 
-    <BarraReporte
+      <BarraReporte
         estado={estadoReporte}
         error={errorReporte}
         onConfirmar={enviarReporte}
@@ -372,11 +358,8 @@ function VentanaConversacion({ conversacion, usuario, onEnviar, onVolver }) {
         </p>
 
         {grupos.length === 0 ? (
-          // Conversación nueva: sugerencias para empezar
           <div className="mx-auto mt-8 max-w-sm text-center">
-            <p className="text-sm text-gray-700">
-              Escríbele a {contacto.nombre.split(' ')[0]} para preguntar por el lugar.
-            </p>
+            <p className="text-sm text-gray-700">Escríbele a {contacto.nombre.split(' ')[0]} para preguntar por el lugar.</p>
             {usuario.rol === 'estudiante' && (
               <div className="mt-4 flex flex-col items-center gap-2">
                 {SUGERENCIAS.map((sugerencia) => (
@@ -421,30 +404,41 @@ function VentanaConversacion({ conversacion, usuario, onEnviar, onVolver }) {
           e.preventDefault()
           enviar()
         }}
-        className="flex items-end gap-2 border-t border-home-orange-100 bg-white p-3 sm:px-5"
+        className="border-t border-home-orange-100 bg-white p-3 sm:px-5"
       >
-        <label htmlFor="campo-mensaje" className="sr-only">
-          Escribe un mensaje
-        </label>
-        {/* field-sizing-content: el campo crece con el texto (hasta max-h-32) */}
-        <textarea
-          id="campo-mensaje"
-          ref={campoRef}
-          rows={1}
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          onKeyDown={alPresionarTecla}
-          placeholder="Escribe un mensaje…"
-          className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border-2 border-home-orange-200 bg-white px-4 py-2.5 text-sm text-gray-900 field-sizing-content placeholder:text-gray-500 focus:border-home-orange-500 focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={!texto.trim()}
-          aria-label="Enviar mensaje"
-          className={`grid h-11 w-11 shrink-0 place-items-center rounded-full bg-home-orange-700 text-white transition-colors hover:bg-home-orange-800 disabled:cursor-not-allowed disabled:bg-home-orange-200 disabled:text-home-orange-700 ${ENFOQUE}`}
-        >
-          <LuSend className="h-5 w-5" aria-hidden="true" />
-        </button>
+        {errorEnvio && (
+          <p role="alert" className="mb-2 text-sm font-medium text-red-700">
+            {errorEnvio}
+          </p>
+        )}
+        <div className="flex items-end gap-2">
+          <label htmlFor="campo-mensaje" className="sr-only">
+            Escribe un mensaje
+          </label>
+          <textarea
+            id="campo-mensaje"
+            ref={campoRef}
+            rows={1}
+            maxLength={2000}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={alPresionarTecla}
+            placeholder="Escribe un mensaje…"
+            className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border-2 border-home-orange-200 bg-white px-4 py-2.5 text-sm text-gray-900 field-sizing-content placeholder:text-gray-500 focus:border-home-orange-500 focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!texto.trim() || enviando}
+            aria-label="Enviar mensaje"
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-full bg-home-orange-700 text-white transition-colors hover:bg-home-orange-800 disabled:cursor-not-allowed disabled:bg-home-orange-200 disabled:text-home-orange-700 ${ENFOQUE}`}
+          >
+            {enviando ? (
+              <LuLoader className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            ) : (
+              <LuSend className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
+        </div>
       </form>
     </section>
   )
@@ -490,17 +484,29 @@ function SinSeleccion() {
    ========================================================== */
 export default function Chat() {
   const { usuario } = useSesion()
+  const { propiedades } = usePropiedades()
   const [parametros] = useSearchParams()
   const propiedadId = parametros.get('propiedad')
+  const esEstudiante = usuario.rol === 'estudiante'
 
-  // MAQUETA: las conversaciones viven en el estado de esta página.
-  // Con Firebase se leerán y escribirán en Firestore en tiempo real (onSnapshot).
-  const [conversaciones, setConversaciones] = useState(() => cargarConversaciones(usuario, propiedadId))
-
+  const [conversaciones, setConversaciones] = useState([])
+  const [cargando, setCargando] = useState(true)
   // Si llegó desde una propiedad, esa conversación empieza abierta
-  const [seleccionadaId, setSeleccionadaId] = useState(
-    () => conversaciones.find((c) => c.propiedadId === propiedadId)?.id ?? null
+  const [seleccionadaId, setSeleccionadaId] = useState(() =>
+    propiedadId && esEstudiante ? idConversacion(propiedadId, usuario.id) : null
   )
+
+  useEffect(() => {
+    if (usuario.rol === 'admin') return
+    return escucharConversaciones(
+      usuario.id,
+      (lista) => {
+        setConversaciones(lista)
+        setCargando(false)
+      },
+      () => setCargando(false)
+    )
+  }, [usuario.id, usuario.rol])
 
   if (usuario.rol === 'admin') {
     return (
@@ -513,62 +519,76 @@ export default function Chat() {
     )
   }
 
-  // Abre una conversación y la marca como leída
-  const seleccionar = (id) => {
-    setSeleccionadaId(id)
-    setConversaciones((prev) => prev.map((c) => (c.id === id ? { ...c, noLeidos: 0 } : c)))
-  }
+  // Conversación nueva (todavía sin guardar) si el 2nd GUEST llegó desde una propiedad sin conversación
+  const idNueva = propiedadId && esEstudiante ? idConversacion(propiedadId, usuario.id) : null
+  const propiedadNueva =
+    idNueva && !conversaciones.some((c) => c.id === idNueva)
+      ? propiedades.find((p) => p.id === propiedadId && p.estado === 'approved')
+      : null
+  const conversacionNueva = propiedadNueva
+    ? {
+        id: idNueva,
+        nueva: true,
+        propiedadId,
+        propiedadTitulo: propiedadNueva.titulo,
+        estudiante: {
+          id: usuario.id,
+          nombre: usuario.nombre,
+          avatar: usuario.avatar ?? null,
+          aspirante: usuario.aspirante ?? false,
+        },
+        arrendador: { ...propiedadNueva.arrendador, avatar: propiedadNueva.arrendador.avatar ?? null },
+        participantes: [usuario.id, propiedadNueva.arrendador.id],
+        noLeidos: {},
+        ultimoMensaje: null,
+        actualizadoEn: '',
+      }
+    : null
 
-  const enviarMensaje = (conversacionId, texto) => {
-    const nuevoMensaje = {
-      id: `m-${Date.now()}`,
-      autorId: usuario.id,
-      texto,
-      fecha: new Date().toISOString(),
-    }
-    setConversaciones((prev) =>
-      prev.map((c) => (c.id === conversacionId ? { ...c, mensajes: [...c.mensajes, nuevoMensaje] } : c))
+  const lista = conversacionNueva ? [conversacionNueva, ...conversaciones] : conversaciones
+  const seleccionada = lista.find((c) => c.id === seleccionadaId)
+
+  let contenidoLista
+  if (cargando && lista.length === 0) {
+    contenidoLista = (
+      <p className="flex items-center gap-2 px-4 py-6 text-sm text-gray-700" aria-busy="true">
+        <LuLoader className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        Cargando conversaciones…
+      </p>
     )
+  } else if (lista.length > 0) {
+    contenidoLista = (
+      <ListaConversaciones
+        conversaciones={lista}
+        usuario={usuario}
+        seleccionadaId={seleccionadaId}
+        onSeleccionar={setSeleccionadaId}
+      />
+    )
+  } else {
+    contenidoLista = <SinConversaciones rol={usuario.rol} />
   }
-
-  const seleccionada = conversaciones.find((c) => c.id === seleccionadaId)
 
   return (
     <main className="mx-auto max-w-7xl px-4 pb-6 pt-4 md:px-8 md:pt-6">
       <h1 className="sr-only">Mensajes</h1>
 
-      {/* Altura fija según la pantalla, para que solo los mensajes hagan scroll */}
       <div className="flex h-[calc(100dvh-10rem)] min-h-[26rem] overflow-hidden rounded-3xl border border-home-orange-200 bg-white md:h-[calc(100dvh-12rem)]">
         {/* Lista: en móvil se oculta cuando hay una conversación abierta */}
         <div
-          className={`${
-            seleccionada ? 'hidden' : 'flex'
-          } w-full flex-col border-home-orange-100 md:flex md:w-80 md:shrink-0 md:border-r lg:w-96`}
+          className={`${seleccionada ? 'hidden' : 'flex'} w-full flex-col border-home-orange-100 md:flex md:w-80 md:shrink-0 md:border-r lg:w-96`}
         >
           <h2 className="border-b border-home-orange-100 px-4 py-4 text-lg font-bold text-gray-900">Mensajes</h2>
-          <div className="flex-1 overflow-y-auto">
-            {conversaciones.length > 0 ? (
-              <ListaConversaciones
-                conversaciones={conversaciones}
-                usuario={usuario}
-                seleccionadaId={seleccionadaId}
-                onSeleccionar={seleccionar}
-              />
-            ) : (
-              <SinConversaciones rol={usuario.rol} />
-            )}
-          </div>
+          <div className="flex-1 overflow-y-auto">{contenidoLista}</div>
         </div>
 
         {/* Conversación: en móvil solo se ve cuando hay una abierta */}
         <div className={`${seleccionada ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col md:flex`}>
           {seleccionada ? (
-            // key: al cambiar de conversación se reinician el campo de texto y el reporte
             <VentanaConversacion
               key={seleccionada.id}
               conversacion={seleccionada}
               usuario={usuario}
-              onEnviar={enviarMensaje}
               onVolver={() => setSeleccionadaId(null)}
             />
           ) : (

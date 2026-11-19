@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { LuHouse, LuPlus, LuPencil, LuLoader } from 'react-icons/lu'
 import { FaStar } from 'react-icons/fa'
@@ -7,12 +7,13 @@ import PropertyCard from '../components/PropertyCard'
 import CampoFormulario from '../components/CampoFormulario'
 import FormularioPropiedad from '../components/FormularioPropiedad'
 import { useSesion } from '../context/sesion'
-import { usuarios, ESTADOS_REVISION, formatoPrecio } from '../data/mockData'
+import { ESTADOS_REVISION, formatoPrecio } from '../data/mockData'
 import { usePropiedades } from '../context/propiedades'
 import { useResenasDePropiedades } from '../hooks/useResenas'
+import { usePerfilAnfitrion } from '../hooks/usePerfilAnfitrion'
 import VerificacionAnfitrion from '../components/VerificacionAnfitrion'
 import SubirAvatar from '../components/SubirAvatar'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
 const ENFOQUE =
@@ -49,11 +50,8 @@ function tiempoComoAnfitrion(anioMes) {
   return `${anios} ${anios === 1 ? 'año' : 'años'}`
 }
 
-// Busca los datos del 2nd HOST. Si no tiene cuenta de ejemplo en mockData,
-// usa los datos básicos que vienen copiados en sus propiedades.
+// Datos básicos del 2nd HOST copiados en sus propiedades (por si todavía no tiene perfil público)
 function obtenerAnfitrion(id, listaPropiedades) {
-  const cuenta = usuarios.find((u) => u.id === id && u.rol === 'arrendador')
-  if (cuenta) return cuenta
   const propiedad = listaPropiedades.find((p) => p.arrendador.id === id)
   return propiedad ? propiedad.arrendador : null
 }
@@ -518,9 +516,34 @@ function AnfitrionNoEncontrado() {
    Vista completa del perfil
    ========================================================== */
 function VistaPerfil({ idAnfitrion, esPropio, usuarioSesion }) {  // Propiedades compartidas: los cambios aquí se reflejan en el catálogo
-  const { propiedades, cambiarDisponibilidad, agregarPropiedad } = usePropiedades()
-  // En el perfil propio, los datos vienen de la sesión (Firestore); en los demás, de las propiedades
-  const anfitrion = esPropio ? usuarioSesion : obtenerAnfitrion(idAnfitrion, propiedades)
+    const { propiedades, cargando: cargandoPropiedades, cambiarDisponibilidad, agregarPropiedad } = usePropiedades()
+  // Perfil público (colección "anfitriones"): lo que ven los 2nd GUESTS
+  const { perfilPublico, cargando: cargandoPerfil } = usePerfilAnfitrion(esPropio ? null : idAnfitrion)
+
+  let anfitrion = obtenerAnfitrion(idAnfitrion, propiedades)
+  if (esPropio) anfitrion = usuarioSesion
+  else if (perfilPublico) anfitrion = { id: idAnfitrion, ...perfilPublico }
+
+  // El perfil propio se copia al perfil público cada vez que cambia (sin correo ni teléfono)
+  const firmaPublica = esPropio
+    ? JSON.stringify({
+        nombre: usuarioSesion.nombre,
+        avatar: usuarioSesion.avatar ?? null,
+        profesion: usuarioSesion.profesion ?? '',
+        edad: usuarioSesion.edad ?? null,
+        pasatiempo: usuarioSesion.pasatiempo ?? '',
+        bio: usuarioSesion.bio ?? '',
+        anfitrionDesde: usuarioSesion.anfitrionDesde ?? '',
+      })
+    : ''
+
+  useEffect(() => {
+    if (!firmaPublica) return
+    setDoc(doc(db, 'anfitriones', idAnfitrion), JSON.parse(firmaPublica)).catch((error) =>
+      console.error('No se pudo actualizar el perfil público:', error.code)
+    )
+  }, [firmaPublica, idAnfitrion])
+
   const perfil = {
     profesion: anfitrion?.profesion ?? '',
     edad: anfitrion?.edad ?? '',
@@ -529,6 +552,16 @@ function VistaPerfil({ idAnfitrion, esPropio, usuarioSesion }) {  // Propiedades
   }
   const [editando, setEditando] = useState(false)
 
+  if (!anfitrion && (cargandoPerfil || cargandoPropiedades)) {
+    return (
+      <main className="grid min-h-[50vh] place-items-center px-4">
+        <p className="flex items-center gap-2 text-gray-700">
+          <LuLoader className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          Cargando perfil…
+        </p>
+      </main>
+    )
+  }
   if (!anfitrion) return <AnfitrionNoEncontrado />
 
   const propiedadesAnfitrion = propiedades.filter((p) => p.arrendador.id === idAnfitrion)

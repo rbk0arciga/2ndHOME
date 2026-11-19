@@ -44,7 +44,6 @@ import {
 import { FaStar } from 'react-icons/fa'
 import Avatar from '../components/Avatar'
 import {
-  usuarios,
   TIPOS_PROPIEDAD,
   GENEROS,
   SERVICIOS,
@@ -62,7 +61,7 @@ import { usePropiedades } from '../context/propiedades'
 import FormularioResena from '../components/FormularioResena'
 import { useResenasDePropiedades } from '../hooks/useResenas'
 import { guardarResena } from '../firebase/resenas'
-
+import { usePerfilAnfitrion } from '../hooks/usePerfilAnfitrion'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -311,29 +310,28 @@ function TarjetaRenta({ propiedad }) {
   )
 }
 
-/* ==========================================================
-   Tarjeta del 2nd HOST
-   ========================================================== */
 function TarjetaAnfitrion({ arrendador }) {
-  // Por ahora solo los usuarios de ejemplo tienen perfil completo en mockData
-  const perfil = usuarios.find((u) => u.id === arrendador.id)
+  // Perfil público actualizado (foto, fecha de inicio); si no existe, se usan los datos de la propiedad
+  const { perfilPublico } = usePerfilAnfitrion(arrendador.id)
+  const avatar = perfilPublico?.avatar ?? arrendador.avatar
+  const nombre = perfilPublico?.nombre ?? arrendador.nombre
 
   return (
     <section aria-labelledby="titulo-anfitrion" className="flex items-center gap-4 rounded-3xl bg-home-orange-100 p-5">
-      <Avatar src={arrendador.avatar} nombre={arrendador.nombre} tamano="lg" />
+      <Avatar src={avatar} nombre={nombre} tamano="lg" />
       <div className="min-w-0">
         <h2 id="titulo-anfitrion" className="text-xs font-semibold text-home-orange-900">
           Tu 2nd HOST
         </h2>
-        <p className="text-lg font-semibold text-gray-900">{arrendador.nombre}</p>
-        {perfil?.anfitrionDesde && (
-          <p className="text-sm text-gray-700">2nd HOST desde {perfil.anfitrionDesde.slice(0, 4)}</p>
+        <p className="text-lg font-semibold text-gray-900">{nombre}</p>
+        {perfilPublico?.anfitrionDesde && (
+          <p className="text-sm text-gray-700">2nd HOST desde {perfilPublico.anfitrionDesde.slice(0, 4)}</p>
         )}
         <Link
           to={`/perfil-arrendador/${arrendador.id}`}
           className={`mt-1 inline-block rounded text-sm font-semibold text-home-orange-800 underline underline-offset-4 hover:text-home-orange-900 ${ENFOQUE}`}
         >
-          Conoce a {primerNombre(arrendador.nombre)}
+          Conoce a {primerNombre(nombre)}
         </Link>
       </div>
     </section>

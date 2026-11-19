@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '../firebase/config'
-import { resenas as resenasDePrueba } from '../data/mockData'
 
 // Fecha de Firestore → "2026-11-17" (mismo formato que las reseñas de prueba)
 function aTextoFecha(marcaDeTiempo) {
@@ -36,8 +35,8 @@ export function useResenasDePropiedades(ids) {
 
   return useMemo(() => {
     const permitidas = new Set(clave ? clave.split(',') : [])
-    return masRecientesPrimero([...resenasDePrueba, ...reales].filter((r) => permitidas.has(r.propiedadId)))
-  }, [clave, reales])
+    return masRecientesPrimero(reales.filter((r) => permitidas.has(r.propiedadId)))
+}, [clave, reales])
 }
 
 // Reseñas escritas por una persona

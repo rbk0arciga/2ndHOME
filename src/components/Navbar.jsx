@@ -15,7 +15,7 @@ import {
 } from 'react-icons/lu'
 import logo from '../assets/logo.png'
 import Avatar from './Avatar'
-import { conversaciones } from '../data/mockData'
+import { useNoLeidos } from '../hooks/useNoLeidos'
 import { useSesion } from '../context/sesion'
 import AvisoVigenciaAspirante from './AvisoVigenciaAspirante'
 import { aspiranteVencido } from '../utils/aspirantes'
@@ -98,7 +98,7 @@ function MenuUsuario({ usuario, accion }) {
     navigate('/login')
   }
   // Total de mensajes sin leer (se muestra como punto y como contador)
-  const noLeidos = conversaciones.reduce((total, c) => total + c.noLeidos, 0)
+  const noLeidos = useNoLeidos(usuario?.id)
   const IconoAccion = accion?.Icono
 
   // Cierra el menú al hacer clic fuera de él o al presionar Escape
