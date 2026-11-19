@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { LuX } from 'react-icons/lu'
-import { COLONIAS, TIPOS_PROPIEDAD, formatoPrecio } from '../data/mockData'
+import {TIPOS_PROPIEDAD, formatoPrecio } from '../data/mockData'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
@@ -61,8 +61,7 @@ function GrupoChips({ titulo, nombre, opciones, valor, onSeleccionar, ayuda }) {
 }
 
 /* ---------- Campos de filtro (se comparten entre móvil y escritorio) ---------- */
-function ContenidoFiltros({ filtros, cambiar, rangoPrecio }) {
-  return (
+function ContenidoFiltros({ filtros, cambiar, rangoPrecio, colonias }) {  return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       {/* Colonia */}
       <div>
@@ -76,7 +75,7 @@ function ContenidoFiltros({ filtros, cambiar, rangoPrecio }) {
           className="mt-2 w-full rounded-xl border border-home-orange-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-home-orange-500 focus:outline-none"
         >
           <option value="">Todas las colonias</option>
-          {COLONIAS.map((colonia) => (
+          {colonias.map((colonia) => (
             <option key={colonia} value={colonia}>
               {colonia}
             </option>
@@ -178,6 +177,7 @@ export default function FilterBar({
   onCambiar,
   onLimpiar,
   rangoPrecio,
+  colonias = [],
   totalResultados,
 }) {
   const esMovil = useEsMovil()
@@ -209,7 +209,9 @@ export default function FilterBar({
 
   if (!abierto) return null
 
-  const contenido = <ContenidoFiltros filtros={filtros} cambiar={cambiar} rangoPrecio={rangoPrecio} />
+  const contenido = (
+    <ContenidoFiltros filtros={filtros} cambiar={cambiar} rangoPrecio={rangoPrecio} colonias={colonias} />
+  )
   const pie = <PieFiltros onLimpiar={onLimpiar} onCerrar={onCerrar} totalResultados={totalResultados} />
 
   /* Móvil: hoja inferior que cubre la pantalla */

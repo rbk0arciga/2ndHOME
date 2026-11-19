@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react'
-import { LuImagePlus, LuX, LuCheck } from 'react-icons/lu'
+import { LuImagePlus, LuX, LuCheck, LuLoader, LuMapPin } from 'react-icons/lu'
 import CampoFormulario from './CampoFormulario'
 import {
   COLONIAS,
@@ -7,20 +7,28 @@ import {
   GENEROS,
   SERVICIOS,
   REGLAS,
+  REGLAS_VISITAS,
   CARACTERISTICAS,
   AMENIDADES,
   formatoPrecio,
+  minutosAPie,
 } from '../data/mockData'
+import { comprimirImagen } from '../utils/imagenes'
+import { distanciaACucei, leerCoordenadas } from '../utils/distancia'
 
 const ENFOQUE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-home-orange-500'
 
-const MAXIMO_FOTOS = 8
+const MAXIMO_FOTOS = 5
+// Las fotos van dentro del documento de la propiedad (máximo 1 MB en Firestore)
+const PESO_MAXIMO_FOTOS = 800_000
+const DISTANCIA_MAXIMA_KM = 40
 const OPCIONES_CONTRATO = [3, 6, 12]
 
 const DATOS_INICIALES = {
   direccion: '',
   colonia: '',
+  ubicacion: '',
   tipo: '',
   genero: '',
   habitacionesTotales: '',
@@ -33,6 +41,7 @@ const DATOS_INICIALES = {
   contratoMeses: 6,
   servicios: [],
   reglas: [],
+  visitas: '',
   descripcion: '',
 }
 
@@ -40,6 +49,7 @@ const DATOS_INICIALES = {
 const ORDEN_CAMPOS = [
   'direccion',
   'colonia',
+  'ubicacion',
   'tipo',
   'genero',
   'habitacionesTotales',
@@ -47,10 +57,10 @@ const ORDEN_CAMPOS = [
   'roomies',
   'precio',
   'deposito',
+  'visitas',
   'fotos',
 ]
 
-// true si el valor es un número entero dentro del rango
 function enteroEnRango(valor, minimo, maximo) {
   const numero = Number(valor)
   return valor !== '' && Number.isInteger(numero) && numero >= minimo && numero <= maximo
@@ -62,6 +72,14 @@ function validar(datos, fotos) {
 
   if (datos.direccion.trim().length < 5) errores.direccion = 'Escribe la calle y el número.'
   if (datos.colonia.trim().length < 3) errores.colonia = 'Escribe la colonia.'
+
+  const coordenadas = leerCoordenadas(datos.ubicacion)
+  if (!coordenadas) {
+    errores.ubicacion = 'Pega las coordenadas de tu casa, por ejemplo 20.6566, -103.3255.'
+  } else if (distanciaACucei(coordenadas) > DISTANCIA_MAXIMA_KM) {
+    errores.ubicacion = `Esa ubicación está a más de ${DISTANCIA_MAXIMA_KM} km de CUCEI. Revisa las coordenadas.`
+  }
+
   if (!datos.tipo) errores.tipo = 'Elige el tipo de espacio.'
   if (!datos.genero) errores.genero = 'Elige quién puede vivir ahí.'
 
@@ -75,18 +93,40 @@ function validar(datos, fotos) {
   if (datos.deposito !== '' && (!Number.isFinite(Number(datos.deposito)) || Number(datos.deposito) < 0)) {
     errores.deposito = 'Escribe un depósito válido o déjalo vacío.'
   }
-
-  if (fotos.length === 0) errores.fotos = 'Agrega al menos una foto del espacio.'
+  if (!datos.visitas) errores.visitas = 'Elige si se permiten visitas.'
+  if (fotos.length === 0) {
+    errores.fotos = 'Agrega al menos una foto del espacio.'
+  } else if (fotos.reduce((total, foto) => total + foto.url.length, 0) > PESO_MAXIMO_FOTOS) {
+    errores.fotos = 'Las fotos pesan demasiado juntas. Quita alguna e inténtalo de nuevo.'
+  }
 
   return errores
 }
 
-// Fecha de hoy como "2026-10-12", en hora local
+// Fecha de hoy como "2026-11-18", en hora local
 function hoyComoTexto() {
   const hoy = new Date()
   const mes = String(hoy.getMonth() + 1).padStart(2, '0')
   const dia = String(hoy.getDate()).padStart(2, '0')
   return `${hoy.getFullYear()}-${mes}-${dia}`
+}
+
+/* ---------- Vista previa de la ubicación ---------- */
+function VistaPreviaUbicacion({ coordenadas }) {
+  const { lat, lng } = coordenadas
+  const margen = 0.004
+  const url = `https://www.openstreetmap.org/export/embed.html?bbox=${lng - margen},${lat - margen},${lng + margen},${lat + margen}&layer=mapnik&marker=${lat},${lng}`
+  const km = distanciaACucei(coordenadas)
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-home-orange-200">
+      <iframe title="Vista previa de la ubicación" src={url} loading="lazy" className="h-48 w-full border-0" />
+      <p className="flex items-center gap-1.5 bg-home-orange-50 px-3 py-2 text-sm text-home-orange-900">
+        <LuMapPin className="h-4 w-4 shrink-0" aria-hidden="true" />A {km} km de CUCEI, unos {minutosAPie(km)} min a
+        pie (aproximado)
+      </p>
+    </div>
+  )
 }
 
 /* ---------- Bloque del formulario con subtítulo ---------- */
@@ -105,7 +145,6 @@ function BloqueFormulario({ titulo, descripcion, children }) {
 /* ---------- Grupo de opciones (radios o casillas) con forma de chip ---------- */
 function GrupoOpciones({ refGrupo, titulo, ayuda, error, children }) {
   return (
-    // tabIndex={-1}: permite llevar el foco al grupo cuando tiene un error
     <fieldset ref={refGrupo} tabIndex={-1} className="focus:outline-none">
       <legend className="text-sm font-semibold text-gray-900">{titulo}</legend>
       {ayuda && <p className="mt-0.5 text-xs text-gray-600">{ayuda}</p>}
@@ -126,7 +165,6 @@ function Chip({ type, name, checked, onChange, children }) {
   )
 }
 
-/* ---------- Lista desplegable con etiqueta ---------- */
 function CampoSelect({ etiqueta, children, ...propsSelect }) {
   const id = useId()
   return (
@@ -148,18 +186,25 @@ function CampoSelect({ etiqueta, children, ...propsSelect }) {
 /* ---------- Formulario ---------- */
 export default function FormularioPropiedad({ arrendador, onPublicar }) {
   const [datos, setDatos] = useState(DATOS_INICIALES)
-  // Cada foto: { id, nombre, url } (url temporal creada en el navegador)
+  // Cada foto: { id, nombre, url } (url = imagen comprimida en base64)
   const [fotos, setFotos] = useState([])
   const [errores, setErrores] = useState({})
+  const [errorGeneral, setErrorGeneral] = useState('')
+  const [procesandoFotos, setProcesandoFotos] = useState(false)
+  const [enviando, setEnviando] = useState(false)
   const [tituloPublicado, setTituloPublicado] = useState('')
 
   const idDescripcion = useId()
   const idGrupoTipo = useId()
   const idGrupoGenero = useId()
+  const idGrupoVisitas = useId()
   const idSugerenciasColonia = useId()
   const mensajeExitoRef = useRef(null)
+
+  // Referencias para llevar el foco al primer campo con error
   const refDireccion = useRef(null)
   const refColonia = useRef(null)
+  const refUbicacion = useRef(null)
   const refTipo = useRef(null)
   const refGenero = useRef(null)
   const refHabitacionesTotales = useRef(null)
@@ -167,54 +212,65 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
   const refRoomies = useRef(null)
   const refPrecio = useRef(null)
   const refDeposito = useRef(null)
+  const refVisitas = useRef(null)
   const refFotos = useRef(null)
+
   const actualizar = (campo, valor) => {
     setDatos((prev) => ({ ...prev, [campo]: valor }))
     if (errores[campo]) setErrores((prev) => ({ ...prev, [campo]: undefined }))
     setTituloPublicado('')
   }
 
-  // Agrega o quita una clave de una lista (servicios, reglas, características o amenidades)
   const alternarEnLista = (campo, clave) => {
     const lista = datos[campo]
     actualizar(campo, lista.includes(clave) ? lista.filter((c) => c !== clave) : [...lista, clave])
   }
 
-  /* ----- Fotos ----- */
-  const agregarFotos = (e) => {
-    const archivos = Array.from(e.target.files ?? []).filter((archivo) => archivo.type.startsWith('image/'))
-    const espacioDisponible = MAXIMO_FOTOS - fotos.length
-    const nuevas = archivos.slice(0, espacioDisponible).map((archivo) => ({
-      id: `${archivo.name}-${archivo.lastModified}-${Math.random()}`,
-      nombre: archivo.name,
-      // URL temporal para la vista previa. Con Firebase, la foto se subirá a Storage.
-      url: URL.createObjectURL(archivo),
-    }))
-    setFotos((prev) => [...prev, ...nuevas])
-    if (errores.fotos) setErrores((prev) => ({ ...prev, fotos: undefined }))
-    e.target.value = '' // Permite volver a elegir el mismo archivo
+  /* ----- Fotos (se comprimen en el navegador) ----- */
+  const agregarFotos = async (e) => {
+    const archivos = Array.from(e.target.files ?? [])
+      .filter((archivo) => archivo.type.startsWith('image/'))
+      .slice(0, MAXIMO_FOTOS - fotos.length)
+    e.target.value = ''
+    if (archivos.length === 0) return
+
+    setProcesandoFotos(true)
+    try {
+      const nuevas = await Promise.all(
+        archivos.map(async (archivo) => ({
+          id: `${archivo.name}-${archivo.lastModified}-${Math.random()}`,
+          nombre: archivo.name,
+          url: await comprimirImagen(archivo, { ladoMaximo: 900, calidad: 0.6 }),
+        }))
+      )
+      setFotos((prev) => [...prev, ...nuevas])
+      if (errores.fotos) setErrores((prev) => ({ ...prev, fotos: undefined }))
+    } catch {
+      setErrores((prev) => ({ ...prev, fotos: 'No pudimos procesar una de las fotos. Usa imágenes JPG o PNG.' }))
+    } finally {
+      setProcesandoFotos(false)
+    }
   }
 
-  const quitarFoto = (id) => {
-    const foto = fotos.find((f) => f.id === id)
-    if (foto) URL.revokeObjectURL(foto.url) // Libera la memoria de la vista previa
-    setFotos((prev) => prev.filter((f) => f.id !== id))
-  }
+  const quitarFoto = (id) => setFotos((prev) => prev.filter((f) => f.id !== id))
 
   /* ----- Envío ----- */
   const coloniaEscrita = datos.colonia.trim()
   const tituloGenerado = datos.tipo && coloniaEscrita ? `${TIPOS_PROPIEDAD[datos.tipo]} en ${coloniaEscrita}` : ''
   const esHabitacion = datos.tipo === 'habitacion' || datos.tipo === 'compartida'
+  const coordenadas = leerCoordenadas(datos.ubicacion)
 
-  const alPublicar = (e) => {
+  const alPublicar = async (e) => {
     e.preventDefault()
+    setErrorGeneral('')
     const nuevosErrores = validar(datos, fotos)
     setErrores(nuevosErrores)
 
-        // El objeto se arma aquí (en el evento), no durante el render
+    // El objeto se arma aquí (en el evento), no durante el render
     const refsPorCampo = {
       direccion: refDireccion,
       colonia: refColonia,
+      ubicacion: refUbicacion,
       tipo: refTipo,
       genero: refGenero,
       habitacionesTotales: refHabitacionesTotales,
@@ -222,6 +278,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
       roomies: refRoomies,
       precio: refPrecio,
       deposito: refDeposito,
+      visitas: refVisitas,
       fotos: refFotos,
     }
     const primerError = ORDEN_CAMPOS.find((campo) => nuevosErrores[campo])
@@ -232,13 +289,12 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
 
     const precio = Number(datos.precio)
     const nuevaPropiedad = {
-      id: `nueva-${Date.now()}`,
       tipo: datos.tipo,
       titulo: tituloGenerado,
       colonia: coloniaEscrita,
       direccion: datos.direccion.trim(),
-      coordenadas: null, // Con Firebase se obtendrán a partir de la dirección
-      distanciaKm: null,
+      coordenadas,
+      distanciaKm: distanciaACucei(coordenadas),
       precio,
       deposito: datos.deposito === '' ? precio : Number(datos.deposito),
       calificacion: null,
@@ -247,8 +303,10 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
       serviciosIncluidos: datos.servicios.length > 0,
       disponible: true,
       estado: 'pending', // Toda propiedad nueva pasa por revisión
+      motivoRechazo: '',
       fechaPublicacion: hoyComoTexto(),
-      arrendador,
+      // Firestore no acepta valores "undefined": sin foto de perfil se guarda null
+      arrendador: { id: arrendador.id, nombre: arrendador.nombre, avatar: arrendador.avatar ?? null },
       imagenes: fotos.map((f) => f.url),
       descripcion: datos.descripcion.trim(),
       habitacionesTotales: Number(datos.habitacionesTotales),
@@ -257,18 +315,27 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
       caracteristicas: datos.caracteristicas,
       servicios: datos.servicios,
       amenidades: datos.amenidades,
-      reglas: datos.reglas,
+      reglas: [...datos.reglas, datos.visitas],
       contratoMeses: Number(datos.contratoMeses),
     }
 
-    // MAQUETA: con Firebase aquí se subirán las fotos a Storage y se guardará en Firestore
-    onPublicar(nuevaPropiedad)
-
-    setDatos(DATOS_INICIALES)
-    setFotos([]) // Las URLs no se liberan: la propiedad publicada todavía las usa
-    setTituloPublicado(tituloGenerado)
-    // Espera a que el mensaje se muestre y lleva el foco hacia él
-    setTimeout(() => mensajeExitoRef.current?.focus(), 0)
+    setEnviando(true)
+    try {
+      await onPublicar(nuevaPropiedad)
+      setDatos(DATOS_INICIALES)
+      setFotos([])
+      setTituloPublicado(tituloGenerado)
+      setTimeout(() => mensajeExitoRef.current?.focus(), 0)
+    } catch (error) {
+      console.error('No se pudo publicar la propiedad:', error.code)
+      setErrorGeneral(
+        error.code === 'permission-denied'
+          ? 'No pudimos enviarla. Revisa que ya hayas enviado tus documentos de verificación.'
+          : 'No pudimos enviar la propiedad. Revisa tu conexión e inténtalo de nuevo.'
+      )
+    } finally {
+      setEnviando(false)
+    }
   }
 
   const textoDeposito =
@@ -317,7 +384,6 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
               onChange={(e) => actualizar('direccion', e.target.value)}
               error={errores.direccion}
             />
-            {/* Texto libre con sugerencias: se puede escribir cualquier colonia */}
             <CampoFormulario
               ref={refColonia}
               etiqueta="Colonia"
@@ -335,6 +401,18 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
               ))}
             </datalist>
           </div>
+
+          <CampoFormulario
+            ref={refUbicacion}
+            etiqueta="Ubicación en el mapa (coordenadas)"
+            placeholder="20.6566, -103.3255"
+            Icono={LuMapPin}
+            value={datos.ubicacion}
+            onChange={(e) => actualizar('ubicacion', e.target.value)}
+            ayuda="En Google Maps, haz clic derecho sobre tu casa y luego clic en los números que aparecen hasta arriba (se copian solos). Pégalos aquí."
+            error={errores.ubicacion}
+          />
+          {coordenadas && !errores.ubicacion && <VistaPreviaUbicacion coordenadas={coordenadas} />}
         </BloqueFormulario>
 
         {/* ---------- El espacio ---------- */}
@@ -496,17 +574,35 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
             ))}
           </GrupoOpciones>
 
-          <GrupoOpciones titulo="Reglas de la casa">
-            {Object.entries(REGLAS).map(([clave, etiqueta]) => (
+          {/* Visitas: solo una opción */}
+          <GrupoOpciones refGrupo={refVisitas} titulo="Visitas" error={errores.visitas}>
+            {REGLAS_VISITAS.map((clave) => (
               <Chip
                 key={clave}
-                type="checkbox"
-                checked={datos.reglas.includes(clave)}
-                onChange={() => alternarEnLista('reglas', clave)}
+                type="radio"
+                name={idGrupoVisitas}
+                checked={datos.visitas === clave}
+                onChange={() => actualizar('visitas', clave)}
               >
-                {etiqueta}
+                {REGLAS[clave]}
               </Chip>
             ))}
+          </GrupoOpciones>
+
+          {/* El resto de las reglas se pueden combinar */}
+          <GrupoOpciones titulo="Otras reglas de la casa">
+            {Object.entries(REGLAS)
+              .filter(([clave]) => !REGLAS_VISITAS.includes(clave))
+              .map(([clave, etiqueta]) => (
+                <Chip
+                  key={clave}
+                  type="checkbox"
+                  checked={datos.reglas.includes(clave)}
+                  onChange={() => alternarEnLista('reglas', clave)}
+                >
+                  {etiqueta}
+                </Chip>
+              ))}
           </GrupoOpciones>
         </BloqueFormulario>
 
@@ -532,7 +628,7 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
               Hasta {MAXIMO_FOTOS} fotos. La primera será la portada en el catálogo.
             </p>
 
-            <ul className="mt-2 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            <ul className="mt-2 grid grid-cols-3 gap-3 sm:grid-cols-5">
               {fotos.map((foto, indice) => (
                 <li key={foto.id} className="relative aspect-square overflow-hidden rounded-2xl bg-home-orange-100">
                   <img src={foto.url} alt={`Foto ${indice + 1}: ${foto.nombre}`} className="h-full w-full object-cover" />
@@ -555,14 +651,19 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
               {fotos.length < MAXIMO_FOTOS && (
                 <li>
                   <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-home-orange-300 text-center text-xs font-semibold text-home-orange-800 transition-colors hover:bg-home-orange-50 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-home-orange-500">
-                    <LuImagePlus className="h-6 w-6" aria-hidden="true" />
-                    Agregar fotos
+                    {procesandoFotos ? (
+                      <LuLoader className="h-6 w-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                    ) : (
+                      <LuImagePlus className="h-6 w-6" aria-hidden="true" />
+                    )}
+                    {procesandoFotos ? 'Procesando…' : 'Agregar fotos'}
                     <input
                       ref={refFotos}
                       type="file"
                       accept="image/*"
                       multiple
                       onChange={agregarFotos}
+                      disabled={procesandoFotos}
                       className="sr-only"
                     />
                   </label>
@@ -573,11 +674,19 @@ export default function FormularioPropiedad({ arrendador, onPublicar }) {
           </div>
         </BloqueFormulario>
 
+        {errorGeneral && (
+          <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            {errorGeneral}
+          </p>
+        )}
+
         <button
           type="submit"
-          className={`flex h-12 w-full items-center justify-center rounded-full bg-home-orange-700 px-8 font-semibold text-white transition-colors hover:bg-home-orange-800 sm:w-auto ${ENFOQUE}`}
+          disabled={enviando || procesandoFotos}
+          className={`flex h-12 w-full items-center justify-center gap-2 rounded-full bg-home-orange-700 px-8 font-semibold text-white transition-colors hover:bg-home-orange-800 disabled:cursor-wait disabled:opacity-80 sm:w-auto ${ENFOQUE}`}
         >
-          Enviar a revisión
+          {enviando && <LuLoader className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+          {enviando ? 'Enviando…' : 'Enviar a revisión'}
         </button>
       </form>
     </section>

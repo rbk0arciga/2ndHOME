@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { LuSearch, LuSlidersHorizontal } from 'react-icons/lu'
+import { LuSearch, LuSlidersHorizontal, LuLoader, LuHouse } from 'react-icons/lu'
 import ConsejosBanner from '../components/ConsejosBanner'
 import PropertyCard from '../components/PropertyCard'
 import FilterBar from '../components/FilterBar'
@@ -31,7 +31,6 @@ const ORDENES = {
 const normalizar = (texto) =>
   texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
-// Cuenta los filtros activos (se muestra como número en el botón "Filtros")
 function contarFiltrosActivos(filtros) {
   let total = 0
   if (filtros.colonia) total++
@@ -42,7 +41,6 @@ function contarFiltrosActivos(filtros) {
   return total
 }
 
-// Decide si una propiedad cumple la búsqueda y los filtros
 function cumpleFiltros(propiedad, textoBuscado, filtros) {
   if (textoBuscado && !normalizar(`${propiedad.titulo} ${propiedad.colonia}`).includes(textoBuscado)) return false
   if (filtros.colonia && propiedad.colonia !== filtros.colonia) return false
@@ -50,8 +48,7 @@ function cumpleFiltros(propiedad, textoBuscado, filtros) {
   if (filtros.precioMax !== null && propiedad.precio > filtros.precioMax) return false
   if (filtros.soloServiciosIncluidos && !propiedad.serviciosIncluidos) return false
 
-  // Género: quien busca "mujeres" u "hombres" también ve los espacios mixtos,
-  // porque también puede vivir ahí. "mixto" muestra solo los mixtos.
+  // Género: quien busca "mujeres" u "hombres" también ve los espacios mixtos
   if (filtros.genero === 'mixto' && propiedad.genero !== 'mixto') return false
   if (
     (filtros.genero === 'mujeres' || filtros.genero === 'hombres') &&
@@ -65,17 +62,14 @@ function cumpleFiltros(propiedad, textoBuscado, filtros) {
 }
 
 export default function Home() {
-  const { propiedades } = usePropiedades()
+  const { propiedades, cargando } = usePropiedades()
   const [busqueda, setBusqueda] = useState('')
   const [filtros, setFiltros] = useState(FILTROS_INICIALES)
   const [orden, setOrden] = useState('cercania')
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
 
   // Catálogo público: solo propiedades aprobadas y con lugares disponibles
-  const catalogo = useMemo(
-    () => propiedades.filter((p) => p.estado === 'approved' && p.disponible),
-    [propiedades]
-  )
+  const catalogo = useMemo(() => propiedades.filter((p) => p.estado === 'approved' && p.disponible), [propiedades])
 
   // Rango de precios del catálogo actual (lo usa el control de precio en los filtros)
   const rangoPrecio = useMemo(() => {
@@ -83,7 +77,12 @@ export default function Home() {
     return precios.length ? { min: Math.min(...precios), max: Math.max(...precios) } : { min: 0, max: 0 }
   }, [catalogo])
 
-  // Recalcula los resultados solo cuando cambia algo relevante
+  // Colonias que realmente tienen lugares publicados (para el filtro)
+  const colonias = useMemo(
+    () => [...new Set(catalogo.map((p) => p.colonia))].sort((a, b) => a.localeCompare(b, 'es')),
+    [catalogo]
+  )
+
   const resultados = useMemo(() => {
     const textoBuscado = normalizar(busqueda.trim())
     return catalogo.filter((p) => cumpleFiltros(p, textoBuscado, filtros)).sort(ORDENES[orden].comparar)
@@ -91,8 +90,7 @@ export default function Home() {
 
   const filtrosActivos = contarFiltrosActivos(filtros)
 
-  // El panel de filtros siempre recibe un número de precio. Si el usuario lleva el
-  // control hasta el máximo, se guarda como "sin límite" (null).
+  // El panel siempre recibe un número de precio; el máximo se guarda como "sin límite" (null)
   const filtrosParaPanel = { ...filtros, precioMax: filtros.precioMax ?? rangoPrecio.max }
   const cambiarFiltros = (nuevos) =>
     setFiltros({ ...nuevos, precioMax: nuevos.precioMax >= rangoPrecio.max ? null : nuevos.precioMax })
@@ -100,6 +98,50 @@ export default function Home() {
   const limpiarTodo = () => {
     setFiltros(FILTROS_INICIALES)
     setBusqueda('')
+  }
+
+  // Contenido del catálogo según el estado
+  let contenido
+  if (cargando) {
+    contenido = (
+      <p className="mt-6 flex items-center gap-2 text-gray-700" aria-busy="true">
+        <LuLoader className="h-5 w-5 animate-spin text-home-orange-600 motion-reduce:animate-none" aria-hidden="true" />
+        Cargando lugares…
+      </p>
+    )
+  } else if (catalogo.length === 0) {
+    contenido = (
+      <div className="mt-6 rounded-3xl border-2 border-dashed border-home-orange-200 bg-white px-6 py-12 text-center">
+        <LuHouse className="mx-auto h-10 w-10 text-home-orange-400" aria-hidden="true" />
+        <h2 className="mt-4 text-lg font-semibold text-gray-900">Todavía no hay lugares publicados</h2>
+        <p className="mt-1 text-sm text-gray-700">Vuelve pronto: los 2nd HOSTS están preparando sus espacios.</p>
+      </div>
+    )
+  } else if (resultados.length > 0) {
+    contenido = (
+      <ul className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {resultados.map((propiedad) => (
+          <li key={propiedad.id}>
+            <PropertyCard propiedad={propiedad} />
+          </li>
+        ))}
+      </ul>
+    )
+  } else {
+    contenido = (
+      <div className="mt-6 rounded-3xl border-2 border-dashed border-home-orange-200 bg-white px-6 py-12 text-center">
+        <LuSearch className="mx-auto h-10 w-10 text-home-orange-400" aria-hidden="true" />
+        <h2 className="mt-4 text-lg font-semibold text-gray-900">No encontramos lugares con esos filtros</h2>
+        <p className="mt-1 text-sm text-gray-700">Prueba con otra colonia o amplía tu presupuesto.</p>
+        <button
+          type="button"
+          onClick={limpiarTodo}
+          className={`mt-6 rounded-full bg-home-orange-700 px-6 py-2.5 font-semibold text-white transition-colors hover:bg-home-orange-800 ${ENFOQUE}`}
+        >
+          Quitar filtros y búsqueda
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -139,7 +181,6 @@ export default function Home() {
             className={`flex h-12 shrink-0 items-center gap-2 rounded-full bg-home-orange-300 px-4 font-semibold text-home-orange-900 transition-colors hover:bg-home-orange-400 md:h-14 md:px-6 ${ENFOQUE}`}
           >
             <LuSlidersHorizontal className="h-5 w-5" aria-hidden="true" />
-            {/* En móvil solo se ve el ícono, pero el texto sigue disponible para lectores de pantalla */}
             <span className="sr-only sm:not-sr-only">Filtros</span>
             {filtrosActivos > 0 && (
               <span className="grid h-6 min-w-6 place-items-center rounded-full bg-home-orange-700 px-1.5 text-xs text-white">
@@ -149,7 +190,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Panel de filtros: Home guarda el estado y FilterBar solo lo muestra y lo modifica */}
         <FilterBar
           id="panel-filtros"
           abierto={filtrosAbiertos}
@@ -158,12 +198,12 @@ export default function Home() {
           onCambiar={cambiarFiltros}
           onLimpiar={() => setFiltros(FILTROS_INICIALES)}
           rangoPrecio={rangoPrecio}
+          colonias={colonias}
           totalResultados={resultados.length}
         />
 
         {/* Encabezado de resultados */}
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          {/* aria-live: los lectores de pantalla anuncian el nuevo total al filtrar */}
           <p className="text-sm text-gray-700" aria-live="polite">
             <span className="font-semibold text-gray-900">{resultados.length}</span>{' '}
             {resultados.length === 1 ? 'lugar disponible' : 'lugares disponibles'}
@@ -185,32 +225,7 @@ export default function Home() {
           </label>
         </div>
 
-        {/* Catálogo: 1 columna en móvil, 2 en tablet, 3 en escritorio */}
-        {resultados.length > 0 ? (
-          <ul className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {resultados.map((propiedad) => (
-              <li key={propiedad.id}>
-                <PropertyCard propiedad={propiedad} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          // Estado vacío: explica qué pasó y ofrece una salida
-          <div className="mt-6 rounded-3xl border-2 border-dashed border-home-orange-200 bg-white px-6 py-12 text-center">
-            <LuSearch className="mx-auto h-10 w-10 text-home-orange-400" aria-hidden="true" />
-            <h2 className="mt-4 text-lg font-semibold text-gray-900">
-              No encontramos lugares con esos filtros
-            </h2>
-            <p className="mt-1 text-sm text-gray-700">Prueba con otra colonia o amplía tu presupuesto.</p>
-            <button
-              type="button"
-              onClick={limpiarTodo}
-              className={`mt-6 rounded-full bg-home-orange-700 px-6 py-2.5 font-semibold text-white transition-colors hover:bg-home-orange-800 ${ENFOQUE}`}
-            >
-              Quitar filtros y búsqueda
-            </button>
-          </div>
-        )}
+        {contenido}
       </div>
     </main>
   )

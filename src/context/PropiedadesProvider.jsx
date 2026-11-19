@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, onSnapshot } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
 import { PropiedadesContext } from './propiedades'
 import { useSesion } from './sesion'
 import { db } from '../firebase/config'
-import { propiedades as propiedadesIniciales } from '../data/mockData'
 
-// Agrega a cada propiedad las reseñas reales de Firestore: recalcula el promedio y el total.
-// Los datos de prueba ya traen una calificación y un número de reseñas; las reales se suman a esos.
+// Recalcula la calificación y el número de reseñas de cada propiedad con las reseñas reales
 function aplicarResenas(propiedades, resenas) {
   const porPropiedad = {}
   resenas.forEach((resena) => {
@@ -27,13 +35,56 @@ function aplicarResenas(propiedades, resenas) {
   })
 }
 
+// Qué consultas puede hacer cada rol (deben coincidir con las reglas de Firestore)
+function consultasPorRol(rol) {
+  if (rol === 'admin') return ['todas']
+  if (rol === 'arrendador') return ['aprobadas', 'propias']
+  return ['aprobadas']
+}
+
 export default function PropiedadesProvider({ children }) {
   const { usuario } = useSesion()
   const idUsuario = usuario?.id
+  const rol = usuario?.rol
+  // Identifica la sesión actual para no mezclar datos de una sesión anterior
+  const claveSesion = idUsuario && rol ? `${idUsuario}:${rol}` : ''
 
-  // MAQUETA: copia en memoria compartida por todas las páginas; se reinicia al recargar.
-  const [propiedades, setPropiedades] = useState(propiedadesIniciales)
+  // { clave: sesión a la que pertenecen, datos: { consulta: [...] }, cargadas: { consulta: true } }
+  const [estado, setEstado] = useState({ clave: '', datos: {}, cargadas: {} })
   const [resenasReales, setResenasReales] = useState([])
+
+  // Propiedades en tiempo real, con las consultas que permite cada rol
+  useEffect(() => {
+    if (!claveSesion) return
+    const base = collection(db, 'propiedades')
+    const consultas = {
+      todas: base,
+      aprobadas: query(base, where('estado', '==', 'approved')),
+      propias: query(base, where('arrendador.id', '==', idUsuario)),
+    }
+
+    const actualizar = (nombre, lista) =>
+      setEstado((prev) => {
+        const mismaSesion = prev.clave === claveSesion
+        return {
+          clave: claveSesion,
+          datos: { ...(mismaSesion ? prev.datos : {}), ...(lista ? { [nombre]: lista } : {}) },
+          cargadas: { ...(mismaSesion ? prev.cargadas : {}), [nombre]: true },
+        }
+      })
+
+    const cancelar = consultasPorRol(rol).map((nombre) =>
+      onSnapshot(
+        consultas[nombre],
+        (resultado) => actualizar(nombre, resultado.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        (error) => {
+          console.error(`No se pudieron leer las propiedades (${nombre}):`, error.code)
+          actualizar(nombre, null)
+        }
+      )
+    )
+    return () => cancelar.forEach((dejarDeEscuchar) => dejarDeEscuchar())
+  }, [claveSesion, idUsuario, rol])
 
   // Reseñas reales en tiempo real (las reglas exigen sesión para leerlas)
   useEffect(() => {
@@ -45,33 +96,46 @@ export default function PropiedadesProvider({ children }) {
     )
   }, [idUsuario])
 
-  const propiedadesConResenas = useMemo(
-    () => aplicarResenas(propiedades, idUsuario ? resenasReales : []),
-    [propiedades, resenasReales, idUsuario]
-  )
+  // Une las consultas (sin repetir) y aplica las reseñas
+  const propiedades = useMemo(() => {
+    if (!claveSesion || estado.clave !== claveSesion) return []
+    const porId = new Map()
+    Object.values(estado.datos)
+      .flat()
+      .forEach((propiedad) => porId.set(propiedad.id, propiedad))
+    return aplicarResenas([...porId.values()], resenasReales)
+  }, [estado, claveSesion, resenasReales])
+
+  const cargando =
+    Boolean(claveSesion) &&
+    (estado.clave !== claveSesion || consultasPorRol(rol).some((nombre) => !estado.cargadas[nombre]))
 
   // El 2nd HOST activa o pausa un espacio
   const cambiarDisponibilidad = (id) => {
-    setPropiedades((prev) => prev.map((p) => (p.id === id ? { ...p, disponible: !p.disponible } : p)))
-  }
-
-  // El 2nd HOST publica un espacio nuevo (llega como 'pending')
-  const agregarPropiedad = (nueva) => {
-    setPropiedades((prev) => [nueva, ...prev])
-  }
-
-  // El administrador aprueba o rechaza. Al rechazar, se guarda el motivo para el 2nd HOST.
-  const cambiarEstado = (id, estado, motivoRechazo = '') => {
-    setPropiedades((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, estado, motivoRechazo: estado === 'rejected' ? motivoRechazo : '' } : p
-      )
+    const propiedad = propiedades.find((p) => p.id === id)
+    if (!propiedad) return
+    updateDoc(doc(db, 'propiedades', id), { disponible: !propiedad.disponible }).catch((error) =>
+      console.error('No se pudo cambiar la disponibilidad:', error.code)
     )
   }
 
+  // El 2nd HOST publica un espacio nuevo (llega como 'pending'). Devuelve la promesa para mostrar errores.
+  const agregarPropiedad = (datos) => addDoc(collection(db, 'propiedades'), { ...datos, creadaEn: serverTimestamp() })
+
+  // El administrador aprueba o rechaza. Al rechazar, se guarda el motivo para el 2nd HOST.
+  const cambiarEstado = (id, nuevoEstado, motivoRechazo = '') => {
+    updateDoc(doc(db, 'propiedades', id), {
+      estado: nuevoEstado,
+      motivoRechazo: nuevoEstado === 'rejected' ? motivoRechazo : '',
+    }).catch((error) => console.error('No se pudo cambiar el estado:', error.code))
+  }
+
+  // El 2nd HOST (o el administrador) elimina una propiedad
+  const eliminarPropiedad = (id) => deleteDoc(doc(db, 'propiedades', id))
+
   return (
     <PropiedadesContext.Provider
-      value={{ propiedades: propiedadesConResenas, cambiarDisponibilidad, agregarPropiedad, cambiarEstado }}
+      value={{ propiedades, cargando, cambiarDisponibilidad, agregarPropiedad, cambiarEstado, eliminarPropiedad }}
     >
       {children}
     </PropiedadesContext.Provider>

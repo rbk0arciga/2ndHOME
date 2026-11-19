@@ -373,59 +373,97 @@ function InterruptorDisponibilidad({ idEtiqueta, activo, onCambiar }) {
   )
 }
 
-function ItemGestion({ propiedad, onCambiarDisponibilidad }) {
+function ItemGestion({ propiedad, onCambiarDisponibilidad, onEliminar }) {
   const { id, titulo, imagenes, precio, estado, disponible } = propiedad
-  const esNueva = id.startsWith('nueva-') // Las recién publicadas aún no tienen página de detalle
+  const [confirmando, setConfirmando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
   const idEtiqueta = `disponibilidad-${id}`
 
+  const eliminar = async () => {
+    setEliminando(true)
+    try {
+      await onEliminar(id)
+    } catch {
+      setEliminando(false)
+      setConfirmando(false)
+    }
+  }
+
   return (
-    <li className="flex flex-col gap-4 rounded-3xl border border-home-orange-200 bg-white p-5 sm:flex-row sm:items-center">
-      <div className="flex min-w-0 flex-1 gap-4">
-        <FotoMiniatura src={imagenes?.[0]} titulo={titulo} />
-        <div className="min-w-0">
-          <h3 className="font-semibold leading-snug text-gray-900">{titulo}</h3>
-          <p className="mt-0.5 text-sm text-gray-700">
-            <span className="font-semibold text-home-orange-800">{formatoPrecio(precio)}</span> al mes
-          </p>
-          <p className="mt-2 flex flex-wrap items-center gap-2">
-            <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${ESTILO_ESTADO[estado]}`}>
-              {ESTADOS_REVISION[estado]}
-            </span>
-            {NOTA_ESTADO[estado] && <span className="text-xs text-gray-600">{NOTA_ESTADO[estado]}</span>}
-          </p>
-                    {estado === 'rejected' && propiedad.motivoRechazo && (
-            <p className="mt-2 rounded-xl bg-red-50 p-2.5 text-xs text-red-800">
-              <span className="font-semibold">Motivo:</span> {propiedad.motivoRechazo}
+    <li className="rounded-3xl border border-home-orange-200 bg-white p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 gap-4">
+          <FotoMiniatura src={imagenes?.[0]} titulo={titulo} />
+          <div className="min-w-0">
+            <h3 className="font-semibold leading-snug text-gray-900">{titulo}</h3>
+            <p className="mt-0.5 text-sm text-gray-700">
+              <span className="font-semibold text-home-orange-800">{formatoPrecio(precio)}</span> al mes
             </p>
+            <p className="mt-2 flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${ESTILO_ESTADO[estado]}`}>
+                {ESTADOS_REVISION[estado]}
+              </span>
+              {NOTA_ESTADO[estado] && <span className="text-xs text-gray-600">{NOTA_ESTADO[estado]}</span>}
+            </p>
+            {estado === 'rejected' && propiedad.motivoRechazo && (
+              <p className="mt-2 rounded-xl bg-red-50 p-2.5 text-xs text-red-800">
+                <span className="font-semibold">Motivo:</span> {propiedad.motivoRechazo}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 border-t border-home-orange-100 pt-4 sm:border-t-0 sm:pt-0">
+          {estado === 'approved' && (
+            <div className="flex items-center gap-2">
+              <InterruptorDisponibilidad
+                idEtiqueta={idEtiqueta}
+                activo={disponible}
+                onCambiar={() => onCambiarDisponibilidad(id)}
+              />
+              <span id={idEtiqueta} className="text-sm text-gray-800">
+                {disponible ? 'Con lugares disponibles' : 'Sin lugares por ahora'}
+              </span>
+            </div>
+          )}
+          <Link to={`/propiedad/${id}`} className={`text-sm ${CLASE_ENLACE}`}>
+            Ver publicación
+          </Link>
+          {!confirmando && (
+            <button
+              type="button"
+              onClick={() => setConfirmando(true)}
+              className={`rounded text-sm font-semibold text-red-700 underline underline-offset-4 hover:text-red-800 ${ENFOQUE}`}
+            >
+              Eliminar
+            </button>
           )}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 border-t border-home-orange-100 pt-4 sm:border-t-0 sm:pt-0">
-        {/* La disponibilidad solo se gestiona en propiedades aprobadas */}
-        {estado === 'approved' && (
-          <div className="flex items-center gap-2">
-            <InterruptorDisponibilidad
-              idEtiqueta={idEtiqueta}
-              activo={disponible}
-              onCambiar={() => onCambiarDisponibilidad(id)}
-            />
-            <span id={idEtiqueta} className="text-sm text-gray-800">
-              {disponible ? 'Disponible' : 'No disponible'}
-            </span>
+      {confirmando && (
+        <div className="mt-4 rounded-2xl bg-red-50 p-4">
+          <p className="text-sm text-red-900">¿Eliminar "{titulo}"? Esta acción no se puede deshacer.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={eliminar}
+              disabled={eliminando}
+              className={`rounded-full bg-red-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-70 ${ENFOQUE}`}
+            >
+              {eliminando ? 'Eliminando…' : 'Eliminar'}
+            </button>
+            <button type="button" onClick={() => setConfirmando(false)} className={CLASE_BOTON_SECUNDARIO}>
+              Cancelar
+            </button>
           </div>
-        )}
-        {!esNueva && (
-          <Link to={`/propiedad/${id}`} className={`text-sm ${CLASE_ENLACE}`}>
-            Ver publicación
-          </Link>
-        )}
-      </div>
+        </div>
+      )}
     </li>
   )
 }
 
-function SeccionGestion({ propiedadesAnfitrion, onCambiarDisponibilidad }) {
+function SeccionGestion({ propiedadesAnfitrion, onCambiarDisponibilidad, onEliminar }) {
   return (
     <section aria-labelledby="titulo-gestion" className="mt-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -448,6 +486,7 @@ function SeccionGestion({ propiedadesAnfitrion, onCambiarDisponibilidad }) {
               key={propiedad.id}
               propiedad={propiedad}
               onCambiarDisponibilidad={onCambiarDisponibilidad}
+              onEliminar={onEliminar}
             />
           ))}
         </ul>

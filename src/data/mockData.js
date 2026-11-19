@@ -57,12 +57,16 @@ export const AMENIDADES = {
 }
 
 export const REGLAS = {
-  noascotas: 'No se permiten mascotas',
-  visitas: 'Visitas con horario',
-  fiestas: 'No se permiten fiestas',
-  fumar: 'No fumar',
-  drogas: 'No se permiten drogas',
+  noMascotas: 'No se permiten mascotas',
+  noFiestas: 'No se permiten fiestas',
+  noFumar: 'No fumar',
+  noVisitas: 'No se permiten visitas',
+  visitasConHorario: 'Visitas con horario',
+  visitasLibres: 'Se permiten visitas',
 }
+
+// Reglas de visitas: se elige solo una (las demás reglas se pueden combinar)
+export const REGLAS_VISITAS = ['noVisitas', 'visitasConHorario', 'visitasLibres']
 
 export const COLONIAS = [
   'Olímpica',
@@ -437,7 +441,7 @@ export const conversaciones = [
     estudianteId: 'u1',
     arrendador: { id: 'u2', nombre: 'Silvia Martínez', avatar: '/img/avatares/silvia.png' },
     propiedadId: 'p1',
-    noLeidos: 1,
+    noLeidos: 0,
     mensajes: [
       { id: 'm1', autorId: 'u1', texto: 'Hola, Silvia. ¿La habitación sigue disponible para el próximo semestre?', fecha: '2026-09-28T18:05' },
       { id: 'm2', autorId: 'u2', texto: '¡Hola, Daniela! Sí, está disponible a partir de enero. ¿Te gustaría agendar una visita?', fecha: '2026-09-28T18:20' },

@@ -37,6 +37,7 @@ import {
   LuPartyPopper,
   LuCigaretteOff,
   LuUsers,
+  LuUserX,
   LuFileText,
   LuUserRound,
 } from 'react-icons/lu'
@@ -94,6 +95,8 @@ const ICONOS = {
   // Reglas
   noMascotas: LuPawPrint,
   visitasConHorario: LuClock,
+  noVisitas: LuUserX,
+  visitasLibres: LuUsers,
   noFiestas: LuPartyPopper,
   noFumar: LuCigaretteOff,
 }
@@ -645,11 +648,19 @@ function PropiedadNoEncontrada() {
    ========================================================== */
 export default function DetallePropiedad() {
   const { id } = useParams()
-  const { propiedades } = usePropiedades()
+  const { propiedades, cargando } = usePropiedades()
   const propiedad = propiedades.find((p) => p.id === id)
   const { usuario } = useSesion()
   const esAdmin = usuario?.rol === 'admin'
   const esDueno = usuario?.id === propiedad?.arrendador.id
+    // Mientras llegan las propiedades de Firestore
+  if (cargando) {
+    return (
+      <main className="grid min-h-[50vh] place-items-center px-4">
+        <p className="text-gray-700">Cargando…</p>
+      </main>
+    )
+  }
   // Solo las propiedades aprobadas son públicas.
   // El administrador y el dueño pueden ver las demás como vista previa.
   if (!propiedad || (propiedad.estado !== 'approved' && !esAdmin && !esDueno)) {
